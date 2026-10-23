@@ -31,6 +31,10 @@ namespace LocalCoop
         public int ReviveRadiusCells { get; set; } = 3;
         /// <summary>Duplicate per-player loot (weapons, skills, mutations, scrolls) for the other player.</summary>
         public bool LootParity { get; set; } = true;
+        /// <summary>Show player 2's health, flasks and items in the bottom-right corner.</summary>
+        public bool P2Hud { get; set; } = true;
+        /// <summary>Show the corner minimap in co-op (off: the game's full-screen map button still works).</summary>
+        public bool ShowMinimap { get; set; } = false;
         /// <summary>Write extra diagnostics to the DCCM log.</summary>
         public bool Verbose { get; set; } = true;
     }
@@ -69,8 +73,8 @@ namespace LocalCoop
             Hook_Viewport.update += Hook_Viewport_update;
             InitLootParity();
 
-            Logger.Information("[LocalCoop] v{Version} loaded. AutoSpawnP2={Auto} SharedCamera={Cam} LootParity={Loot}",
-                Info.Version, Config.AutoSpawnP2, Config.SharedCamera, Config.LootParity);
+            Logger.Information("[LocalCoop] v{Version} loaded. AutoSpawnP2={Auto} SharedCamera={Cam} KeepBothOnScreen={Kb} LootParity={Loot} P2Hud={Hud}",
+                Info.Version, Config.AutoSpawnP2, Config.SharedCamera, Config.KeepBothOnScreen, Config.LootParity, Config.P2Hud);
         }
 
         internal bool IsP2(Hero? h) => h != null && P2 != null && ReferenceEquals(h, P2);
@@ -94,8 +98,11 @@ namespace LocalCoop
                 P2 = p2;                       // must be set before wakeup: init hook keys off it
                 p2.wakeup(lvl, p1.cx, p1.cy);  // -> Hero.init -> our hook swaps the controller
                 p2.refillAllAmmo();
-                p2.lifeBarAbove = true;
                 _p2Down.Reset();
+                MarkInventoryOwned(p1);
+                MarkInventoryOwned(p2);
+                CreateHud2();
+                GiveP2StartingPipes();
                 Logger.Information("[LocalCoop] Player 2 spawned in {Level} at {Cx},{Cy} life={Life}/{Max} items={Items}",
                     lvl.map?.id?.ToString(), p1.cx, p1.cy, p2.life, p2.maxLife, DescribeInventory(p2));
             }
@@ -113,6 +120,7 @@ namespace LocalCoop
             P2 = null;
             _p2Down.Reset();
             _p1Down.Reset();
+            DestroyHud2();
             if (p2 == null) return;
             try { if (p2._level != null) p2.clean(); } catch (Exception ex) { Logger.Warning(ex, "[LocalCoop] P2 clean failed"); }
             try { if (!p2.destroyed) p2.destroy(); } catch (Exception ex) { Logger.Warning(ex, "[LocalCoop] P2 destroy failed"); }
@@ -173,6 +181,10 @@ namespace LocalCoop
                 // New level: downed players get back up.
                 if (_p2Down.Active) Revive(p2, _p2Down, "level change");
                 if (_p1Down.Active) Revive(hero, _p1Down, "level change");
+                MarkInventoryOwned(hero);
+                MarkInventoryOwned(p2);
+                RefreshHud2();
+                GiveP2StartingPipes();
                 if (Config.Verbose) Logger.Information("[LocalCoop] P2 followed into {Level} at {Cx},{Cy}", lvl.map?.id?.ToString(), cx, cy);
             }
             catch (Exception ex) { Logger.Error(ex, "[LocalCoop] Moving P2 to new level failed"); }

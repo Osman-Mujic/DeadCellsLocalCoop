@@ -102,10 +102,10 @@ namespace LocalCoop
 
         public bool HasP2Input => P2Pad != null;
 
-        public ControllerAccess CreateP2Access()
+        public ControllerAccess CreateP2Access(bool exclusive = false)
         {
             EnsureCreated();
-            var ca = P2Controller!.createAccess("hero".AsHaxeString(), null);
+            var ca = P2Controller!.createAccess((exclusive ? "p2menu" : "hero").AsHaxeString(), exclusive);
             ca.rightDeadZone = 0;
             return ca;
         }
