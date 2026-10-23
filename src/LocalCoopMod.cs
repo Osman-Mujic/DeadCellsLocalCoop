@@ -16,7 +16,11 @@ namespace LocalCoop
         public bool P2UsesFirstPad { get; set; } = false;
         /// <summary>Camera follows the midpoint of both players.</summary>
         public bool SharedCamera { get; set; } = true;
-        /// <summary>Max distance (cells) before the trailing player is pulled to the leader.</summary>
+        /// <summary>Players can't walk off the shared screen: the camera only moves when both go that way.</summary>
+        public bool KeepBothOnScreen { get; set; } = true;
+        /// <summary>How close (cells) to the screen edge a player may get when KeepBothOnScreen is on.</summary>
+        public int ScreenEdgeMarginCells { get; set; } = 3;
+        /// <summary>Max distance (cells) before the trailing player is pulled to the leader (KeepBothOnScreen off).</summary>
         public int LeashCellsX { get; set; } = 34;
         public int LeashCellsY { get; set; } = 20;
         public double LeashGraceSeconds { get; set; } = 1.5;
@@ -259,8 +263,23 @@ namespace LocalCoop
         private void UpdateLeash(Hero p1, Hero p2, double dt)
         {
             if (_p1Down.Active || _p2Down.Active || !ReferenceEquals(p1._level, p2._level)) { _leashTimer = 0; return; }
+
+            // Screen-bound camera: both players must stay inside one screen. The camera sits at the
+            // midpoint, so we cap how far apart they can be horizontally; whoever walks into the
+            // edge is held there until the partner follows. Sizes come from the live viewport
+            // (level pixels, 24 per cell), so this adapts to resolution and zoom.
+            var vp = p1._level.viewport;
+            double screenCellsX = vp != null && vp.wid > 0 ? vp.wid / 24.0 : Config.LeashCellsX;
+            double screenCellsY = vp != null && vp.hei > 0 ? vp.hei / 24.0 : Config.LeashCellsY;
+            if (Config.KeepBothOnScreen)
+                ClampHorizontalSpan(p1, p2, screenCellsX - 2 * Config.ScreenEdgeMarginCells);
+
+            // Vertical gaps can't be held (gravity, drops), so a player who ends up a screen
+            // above/below for a moment is brought back to the other.
+            double limitX = Config.KeepBothOnScreen ? screenCellsX + 4 : Config.LeashCellsX;
+            double limitY = Config.KeepBothOnScreen ? screenCellsY - Config.ScreenEdgeMarginCells : Config.LeashCellsY;
             int dx = System.Math.Abs(p1.cx - p2.cx), dy = System.Math.Abs(p1.cy - p2.cy);
-            if (dx > Config.LeashCellsX || dy > Config.LeashCellsY)
+            if (dx > limitX || dy > limitY)
             {
                 if (_leashTimer <= 0) _leashTimer = Clock.Now;
                 if (Clock.Now - _leashTimer >= Config.LeashGraceSeconds)
@@ -272,6 +291,37 @@ namespace LocalCoop
                 }
             }
             else _leashTimer = 0;
+        }
+
+        private static double PosX(Hero h) => h.cx + h.xr;
+
+        /// <summary>
+        /// If the players are further apart than <paramref name="maxSpan"/> cells, put the one who is
+        /// moving away back at the limit and stop their horizontal motion. Position is moved back
+        /// toward the partner, i.e. through space the player just crossed, so it can't push them
+        /// into a wall.
+        /// </summary>
+        private void ClampHorizontalSpan(Hero p1, Hero p2, double maxSpan)
+        {
+            if (maxSpan < 6) return;
+            double x1 = PosX(p1), x2 = PosX(p2);
+            double span = System.Math.Abs(x1 - x2);
+            if (span <= maxSpan) return;
+
+            // Pick the player pushing outward; if both or neither are, hold the one further from where
+            // the camera currently is (the midpoint), i.e. the one who moved last.
+            Hero left = x1 < x2 ? p1 : p2, right = x1 < x2 ? p2 : p1;
+            bool leftOut = left.dx < -0.001, rightOut = right.dx > 0.001;
+            Hero mover = leftOut && !rightOut ? left : rightOut && !leftOut ? right
+                : (System.Math.Abs(left.dx) >= System.Math.Abs(right.dx) ? left : right);
+            Hero anchor = ReferenceEquals(mover, p1) ? p2 : p1;
+
+            double target = ReferenceEquals(mover, right) ? PosX(anchor) + maxSpan : PosX(anchor) - maxSpan;
+            int cx = (int)System.Math.Floor(target);
+            mover.cx = cx;
+            mover.xr = target - cx;
+            mover.dx = 0;
+            mover.bdx = 0;
         }
 
         internal static string DescribeInventory(Hero h)
