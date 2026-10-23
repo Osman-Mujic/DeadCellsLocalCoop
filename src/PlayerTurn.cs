@@ -18,6 +18,7 @@ namespace LocalCoop
         private readonly ConditionalWeakTable<dc.ui.Process, object> _p2Uis = new();
         private int _p2TurnDepth;
         private int _p2UiDepth;
+        private int _replaceUiDepth;
 
         private void InitPlayerTurns()
         {
@@ -79,8 +80,8 @@ namespace LocalCoop
 
         internal readonly struct P2Scope
         {
-            public readonly Hero? Hero; public readonly bool Active; public readonly bool Turn;
-            public P2Scope(Hero? h, bool a, bool turn) { Hero = h; Active = a; Turn = turn; }
+            public readonly Hero? Hero; public readonly bool Active; public readonly bool Turn; public readonly HUD? HudMe;
+            public P2Scope(Hero? h, bool a, bool turn, HUD? me) { Hero = h; Active = a; Turn = turn; HudMe = me; }
         }
 
         /// <summary>
@@ -92,8 +93,11 @@ namespace LocalCoop
             var game = Game.Class.ME;
             var p2 = P2;
             if (game == null || p2 == null) return default;
-            var s = new P2Scope(game.hero, true, swapHero);
+            var s = new P2Scope(game.hero, true, swapHero, HUD.Class.ME);
             if (swapHero) game.hero = p2;
+            // HUD.ME is what hero code writes its life bar, flasks and cooldowns to. P2's HUD shares P1's
+            // minimap and counters (see CreateHud2), so nothing reachable through it is ever null.
+            if (Hud2Ok) HUD.Class.ME = _hud2;
             _p2ActDepth++;
             if (swapHero) _p2TurnDepth++;
             return s;
@@ -108,6 +112,7 @@ namespace LocalCoop
             if (game == null) return;
             // Only restore what we changed (a Richter swap in between wins).
             if (s.Turn && ReferenceEquals(game.hero, P2)) game.hero = s.Hero;
+            if (_hud2 != null && ReferenceEquals(HUD.Class.ME, _hud2)) HUD.Class.ME = s.HudMe;
         }
 
         /// <summary>Run <paramref name="act"/> as player 2 (hero + HUD).</summary>
@@ -141,12 +146,17 @@ namespace LocalCoop
 
         private void AsOwner(dc.ui.Process ui, Action act)
         {
-            if (P2 != null && !P2.destroyed && _p2Uis.TryGetValue(ui, out _))
+            _replaceUiDepth++;   // an item dropped by any replace/choose menu is a player's old item: never copied
+            try
             {
-                _p2UiDepth++;
-                try { WithHero(P2, act); } finally { _p2UiDepth--; }
+                if (P2 != null && !P2.destroyed && _p2Uis.TryGetValue(ui, out _))
+                {
+                    _p2UiDepth++;
+                    try { WithHero(P2, act); } finally { _p2UiDepth--; }
+                }
+                else act();
             }
-            else act();
+            finally { _replaceUiDepth--; }
         }
     }
 }

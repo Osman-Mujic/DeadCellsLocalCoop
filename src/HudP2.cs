@@ -58,6 +58,16 @@ namespace LocalCoop
             Hook_HUD.setBrutalityTier += Hook_HUD_setBrutalityTier;
             Hook_HUD.setTacticTier += Hook_HUD_setTacticTier;
 
+            // The life bar is written to HUD.ME by Hero.updateLifeBar; make sure each hero writes to its own.
+            // (v0.2.x: P2's damage showed on P1's bar, P1's bar glitched white, P2's stayed half orange.)
+            Hook_Hero.updateLifeBar += (orig, self) =>
+            {
+                if (!Hud2Ok) { orig(self); return; }
+                var want = IsP2(self) ? _hud2 : Game.Class.ME?.hud;
+                var saved = HUD.Class.ME;
+                if (want != null) HUD.Class.ME = want;
+                try { orig(self); } finally { HUD.Class.ME = saved; }
+            };
             Hook_Hero.preUpdate += (orig, self) => AsP2Acting(self, () => orig(self));
             Hook_Hero.fixedUpdate += (orig, self) => AsP2Acting(self, () => orig(self));
             Hook_Hero.postUpdate += (orig, self) => AsP2Acting(self, () => orig(self));
@@ -109,8 +119,11 @@ namespace LocalCoop
         private void AsP2Acting(Hero h, Action act)
         {
             if (!IsP2(h)) { act(); return; }
-            _p2ActDepth++;
-            try { act(); } finally { _p2ActDepth--; }
+            // P2 is between levels (cleaned: no sprite, no level) or the run is ending: nothing to update.
+            // v0.2.2 crashed here on "Null access .alpha" when P1's death tore the level down.
+            if (h.spr == null || h._level == null || h.destroyed) return;
+            var s = EnterP2Scope(swapHero: false);
+            try { act(); } finally { ExitP2Scope(s); }
         }
 
         private void CreateHud2()
@@ -127,6 +140,15 @@ namespace LocalCoop
                 _hud2 = new HUD(game);       // the constructor sets HUD.ME = itself
                 game.hud = hud1;
                 HUD.Class.ME = me1;
+                // Shared, single-copy parts live on P1's HUD; P2's HUD points at them so any code that reaches
+                // them through HUD.ME while P2 acts finds the real (visible) objects instead of null/hidden ones.
+                _hud2.minimap = hud1.minimap;
+                _hud2.moneyCount = hud1.moneyCount;
+                _hud2.cellsCount = hud1.cellsCount;
+                _hud2.killCount = hud1.killCount;
+                _hud2.goldCombo = hud1.goldCombo;
+                _hud2.debtCount = hud1.debtCount;
+                _hud2.bossCellCount = hud1.bossCellCount;
                 _hud2.initHero();
             }
             catch (Exception ex)

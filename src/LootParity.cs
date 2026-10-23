@@ -22,6 +22,8 @@ namespace LocalCoop
         private readonly ConditionalWeakTable<ItemDrop, Reservation> _reserved = new();
         private readonly ConditionalWeakTable<Entity, object> _noParity = new();
         private readonly ConditionalWeakTable<InventItem, object> _ownedItems = new();
+        private readonly HashSet<int> _ownedIds = new();
+        private int _dropDepth;
         private int _shopDepth;
         private int _pickDepth;
         private int _spawningClone;
@@ -35,12 +37,26 @@ namespace LocalCoop
             Hook_ShopBooth.onActivate += Hook_ShopBooth_onActivate;
             Hook_RandomWeaponSpawner.spawnItem += Hook_RandomWeaponSpawner_spawnItem;
             Hook_Entity.canHaveRepellingWith += Hook_Entity_canHaveRepellingWith;
+            Hook_Hero.dropAndUpdateItem += (orig, self, i) =>
+            {
+                _dropDepth++;
+                try { return orig(self, i); } finally { _dropDepth--; }
+            };
+            InitCoopFixes();
             InitPlayerTurns();
             InitHud2Hooks();
             InitArmoryHooks();
         }
 
         private void UpdateLootParity(double dt) { }
+
+        private bool IsOwnedId(int id) => id > 0 && _ownedIds.Contains(id);
+        private void AddOwnedId(int id) { if (id > 0) _ownedIds.Add(id); }
+
+        internal static int SafeId(InventItem? item)
+        {
+            try { return item?.permanentId ?? 0; } catch { return 0; }
+        }
 
         internal static string ItemId(InventItem? item)
         {
@@ -52,6 +68,7 @@ namespace LocalCoop
             if (item?.kind == null) return false;
             if (item.kind is InventItemKind.Weapon or InventItemKind.Active or InventItemKind.Talisman or InventItemKind.Perk)
                 return true;
+            if (IsScrollId(ItemId(item))) return false;   // scrolls: both players get the upgrade, see CoopFixes.cs
             if (item.kind is InventItemKind.Consumable or InventItemKind.BagItem)
             {
                 // Scrolls of power, scroll fragments and food are per player; keys and money are not.
@@ -101,7 +118,8 @@ namespace LocalCoop
         {
             orig(self, lvl, x, y, i, isNew, inArmory);
             // Paid for in a shop, or a player's old item dropped while picking/swapping: never copied.
-            if (_shopDepth > 0 || _pickDepth > 0 || _p2UiDepth > 0) _noParity.AddOrUpdate(self, this);
+            if (_shopDepth > 0 || _pickDepth > 0 || _p2UiDepth > 0 || _replaceUiDepth > 0 || _dropDepth > 0)
+                _noParity.AddOrUpdate(self, this);
         }
 
         private bool Hook_ItemDrop_canBeActivated(Hook_ItemDrop.orig_canBeActivated orig, ItemDrop self, Hero by)
@@ -131,7 +149,7 @@ namespace LocalCoop
                     else if (!IsParityItem(item)) why = "not per-player";
                     else if (from is ItemDrop d && _reserved.TryGetValue(d, out _)) why = "reserved/copy";
                     else if (_noParity.TryGetValue(from, out _)) why = "shop/pipe/dropped";
-                    else if (_ownedItems.TryGetValue(item, out _)) why = "already owned";
+                    else if (_ownedItems.TryGetValue(item, out _) || IsOwnedId(SafeId(item))) why = "already owned";
                     else
                     {
                         copy = item.clone(false, null);
@@ -142,7 +160,7 @@ namespace LocalCoop
             }
             catch (Exception ex) { Logger.Warning(ex, "[LocalCoop] Loot parity snapshot failed"); copy = null; }
 
-            if (item != null) _ownedItems.AddOrUpdate(item, this);
+            if (item != null) { _ownedItems.AddOrUpdate(item, this); AddOwnedId(SafeId(item)); }
             _pickDepth++;
             try { RunAsPicker(self, () => orig(self, from, item, onComplete)); }
             finally { _pickDepth--; }
@@ -177,7 +195,7 @@ namespace LocalCoop
             {
                 var items = h.inventory?.items;
                 if (items == null) return;
-                foreach (var o in items) if (o is InventItem ii) _ownedItems.AddOrUpdate(ii, this);
+                foreach (var o in items) if (o is InventItem ii) { _ownedItems.AddOrUpdate(ii, this); AddOwnedId(SafeId(ii)); }
             }
             catch (Exception ex) { Logger.Warning(ex, "[LocalCoop] Marking inventory failed"); }
         }

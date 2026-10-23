@@ -259,6 +259,7 @@ namespace LocalCoop
                     P2.set_sprAlpha(p1.sprAlpha);
                 }
                 UpdateDowned(p1, P2, dt);
+                UpdateTeleportFollow(p1, P2);
                 UpdateLeash(p1, P2, dt);
                 UpdateLootParity(dt);
                 if (CoopTestBot.Enabled) CoopTestBot.Tick(this, dt);
@@ -315,6 +316,7 @@ namespace LocalCoop
                 {
                     p2.setPosCase(p1.cx, p1.cy, null, null);
                     p2.cancelVelocities();
+                    Remember(p2, _last2);   // our own pull is not a teleport
                     _leashTimer = 0;
                     if (Config.Verbose) Logger.Information("[LocalCoop] Leash: pulled P2 to P1 ({Dx},{Dy} cells apart)", dx, dy);
                 }
