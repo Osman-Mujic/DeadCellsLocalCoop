@@ -9,9 +9,7 @@ namespace LocalCoop
     /// <summary>
     /// Loot rules for two players.
     ///
-    /// 1. Starting pipes (the Random*Spawner tubes in the Prisoners' Quarters): each player gets their
-    ///    OWN roll from every pipe, so the two can go for different builds. P1's items and P2's items sit
-    ///    side by side and only their owner can take them.
+    /// 1. Starting pipes (armory tubes): each player pulls their own switch, see Armory.cs.
     /// 2. World loot (weapons, skills, amulets, mutations, scrolls, food found behind doors, in chests,
     ///    dropped by elites...): when one player takes it, a copy appears on the spot that only the
     ///    partner can take.
@@ -24,13 +22,9 @@ namespace LocalCoop
         private readonly ConditionalWeakTable<ItemDrop, Reservation> _reserved = new();
         private readonly ConditionalWeakTable<Entity, object> _noParity = new();
         private readonly ConditionalWeakTable<InventItem, object> _ownedItems = new();
-        private sealed class PipeInfo { public bool InArmory; public ItemDrop? P1Drop; public ItemDrop? P2Drop; }
-        private readonly ConditionalWeakTable<RandomWeaponSpawner, PipeInfo> _pipes = new();
-        private readonly List<WeakReference<RandomWeaponSpawner>> _pipeList = new();
         private int _shopDepth;
         private int _pickDepth;
         private int _spawningClone;
-        private int _spawningP2Pipe;
         private int _parityCopies;
 
         private void InitLootParity()
@@ -43,6 +37,7 @@ namespace LocalCoop
             Hook_Entity.canHaveRepellingWith += Hook_Entity_canHaveRepellingWith;
             InitPlayerTurns();
             InitHud2Hooks();
+            InitArmoryHooks();
         }
 
         private void UpdateLootParity(double dt) { }
@@ -79,57 +74,12 @@ namespace LocalCoop
 
         // ------------------------------------------------------------------ starting pipes
 
+        /// <summary>Tube items are handled by the co-op armory (Armory.cs), never by loot sharing.</summary>
         private ItemDrop Hook_RandomWeaponSpawner_spawnItem(Hook_RandomWeaponSpawner.orig_spawnItem orig, RandomWeaponSpawner self, bool inArmory)
         {
             var drop = orig(self, inArmory);
-            if (drop == null) return drop!;
-            _noParity.AddOrUpdate(drop, this);
-            var info = _pipes.GetValue(self, _ => { _pipeList.Add(new WeakReference<RandomWeaponSpawner>(self)); return new PipeInfo(); });
-            info.InArmory = inArmory;
-            if (_spawningP2Pipe > 0) info.P2Drop = drop;
-            else
-            {
-                info.P1Drop = drop;
-                // Pipe refilled while co-op is running (recycling, armory): keep it P1's and give P2 theirs.
-                if (CoopActive) { Reserve(drop, P1); SpawnP2Pipe(self, info); }
-            }
-            return drop;
-        }
-
-        /// <summary>Give P2 their own roll from every starting pipe in P2's current level.</summary>
-        private void GiveP2StartingPipes()
-        {
-            if (P2 == null) return;
-            var lvl = P2._level;
-            int n = 0;
-            _pipeList.RemoveAll(w => !w.TryGetTarget(out var s) || s.destroyed);
-            foreach (var w in _pipeList.ToArray())
-            {
-                if (!w.TryGetTarget(out var spawner) || !ReferenceEquals(spawner._level, lvl)) continue;
-                if (!_pipes.TryGetValue(spawner, out var info)) continue;
-                if (info.P2Drop != null && !info.P2Drop.destroyed) continue;
-                if (info.P1Drop != null && !info.P1Drop.destroyed) Reserve(info.P1Drop, P1);
-                if (SpawnP2Pipe(spawner, info)) n++;
-            }
-            if (n > 0) Logger.Information("[LocalCoop] Starting pipes: rolled {N} items for P2", n);
-        }
-
-        private bool SpawnP2Pipe(RandomWeaponSpawner spawner, PipeInfo info)
-        {
-            _spawningP2Pipe++;
-            try
-            {
-                var d = spawner.spawnItem(info.InArmory);
-                if (d == null) return false;
-                // Sit next to P1's item in the same tube so both are visible.
-                double xr = spawner.xr >= 0.5 ? spawner.xr - 0.55 : spawner.xr + 0.55;
-                d.setPosCase(spawner.cx, spawner.cy, xr, spawner.yr);
-                Reserve(d, P2);
-                if (Config.Verbose) Logger.Information("[LocalCoop] P2 pipe item: {Item}", d.item?.toString()?.ToString());
-                return true;
-            }
-            catch (Exception ex) { Logger.Warning(ex, "[LocalCoop] Rolling a pipe item for P2 failed"); return false; }
-            finally { _spawningP2Pipe--; }
+            if (drop != null) _noParity.AddOrUpdate(drop, this);
+            return drop!;
         }
 
         private void Reserve(ItemDrop d, Hero? who)
@@ -156,6 +106,7 @@ namespace LocalCoop
 
         private bool Hook_ItemDrop_canBeActivated(Hook_ItemDrop.orig_canBeActivated orig, ItemDrop self, Hero by)
         {
+            if (CoopActive && self.inArmory) return false;   // still locked in a tube: pull its switch
             if (CoopActive && _reserved.TryGetValue(self, out var r) && r.For != null && !r.For.destroyed && by != null && !ReferenceEquals(r.For, by))
                 return false;
             return orig(self, by);

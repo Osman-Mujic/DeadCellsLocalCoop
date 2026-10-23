@@ -102,7 +102,6 @@ namespace LocalCoop
                 MarkInventoryOwned(p1);
                 MarkInventoryOwned(p2);
                 CreateHud2();
-                GiveP2StartingPipes();
                 Logger.Information("[LocalCoop] Player 2 spawned in {Level} at {Cx},{Cy} life={Life}/{Max} items={Items}",
                     lvl.map?.id?.ToString(), p1.cx, p1.cy, p2.life, p2.maxLife, DescribeInventory(p2));
             }
@@ -184,7 +183,6 @@ namespace LocalCoop
                 MarkInventoryOwned(hero);
                 MarkInventoryOwned(p2);
                 RefreshHud2();
-                GiveP2StartingPipes();
                 if (Config.Verbose) Logger.Information("[LocalCoop] P2 followed into {Level} at {Cx},{Cy}", lvl.map?.id?.ToString(), cx, cy);
             }
             catch (Exception ex) { Logger.Error(ex, "[LocalCoop] Moving P2 to new level failed"); }

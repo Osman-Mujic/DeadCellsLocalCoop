@@ -79,35 +79,35 @@ namespace LocalCoop
 
         internal readonly struct P2Scope
         {
-            public readonly Hero? Hero; public readonly HUD? GameHud; public readonly HUD? HudMe; public readonly bool Active;
-            public readonly bool Turn;
-            public P2Scope(Hero? h, HUD? g, HUD? m, bool a, bool turn) { Hero = h; GameHud = g; HudMe = m; Active = a; Turn = turn; }
+            public readonly Hero? Hero; public readonly bool Active; public readonly bool Turn;
+            public P2Scope(Hero? h, bool a, bool turn) { Hero = h; Active = a; Turn = turn; }
         }
 
-        /// <summary>Point game.hero / game.hud / HUD.ME at player 2. Nestable.</summary>
+        /// <summary>
+        /// Point game.hero at player 2 (nestable). game.hud / HUD.ME are deliberately left alone:
+        /// the game reaches the minimap through them; HUD reports are routed instead (see HudP2.cs).
+        /// </summary>
         internal P2Scope EnterP2Scope(bool swapHero = true)
         {
             var game = Game.Class.ME;
             var p2 = P2;
             if (game == null || p2 == null) return default;
-            var s = new P2Scope(game.hero, game.hud, HUD.Class.ME, true, swapHero);
+            var s = new P2Scope(game.hero, true, swapHero);
             if (swapHero) game.hero = p2;
-            var hud2 = _hud2;
-            if (hud2 != null && !hud2.destroyed) { game.hud = hud2; HUD.Class.ME = hud2; }
-            if (swapHero) _p2TurnDepth++;   // HUD-only scopes (P2's per-frame update) are not a "turn"
+            _p2ActDepth++;
+            if (swapHero) _p2TurnDepth++;
             return s;
         }
 
         internal void ExitP2Scope(P2Scope s)
         {
             if (!s.Active) return;
+            _p2ActDepth--;
             if (s.Turn) _p2TurnDepth--;
             var game = Game.Class.ME;
             if (game == null) return;
-            // Only restore what we changed (a Richter swap or HUD rebuild in between wins).
-            if (ReferenceEquals(game.hero, P2)) game.hero = s.Hero;
-            if (_hud2 != null && ReferenceEquals(game.hud, _hud2)) game.hud = s.GameHud;
-            if (_hud2 != null && ReferenceEquals(HUD.Class.ME, _hud2)) HUD.Class.ME = s.HudMe;
+            // Only restore what we changed (a Richter swap in between wins).
+            if (s.Turn && ReferenceEquals(game.hero, P2)) game.hero = s.Hero;
         }
 
         /// <summary>Run <paramref name="act"/> as player 2 (hero + HUD).</summary>
