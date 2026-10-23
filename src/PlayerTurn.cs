@@ -95,9 +95,8 @@ namespace LocalCoop
             if (game == null || p2 == null) return default;
             var s = new P2Scope(game.hero, true, swapHero, HUD.Class.ME);
             if (swapHero) game.hero = p2;
-            // HUD.ME is what hero code writes its life bar, flasks and cooldowns to. P2's HUD shares P1's
-            // minimap and counters (see CreateHud2), so nothing reachable through it is ever null.
-            if (Hud2Ok) HUD.Class.ME = _hud2;
+            // game.hud / HUD.ME are never swapped globally: game code reaches the one minimap through them.
+            // Life bar (Hero.updateLifeBar) and the routed HUD calls (HudP2.cs) target P2's HUD explicitly.
             _p2ActDepth++;
             if (swapHero) _p2TurnDepth++;
             return s;

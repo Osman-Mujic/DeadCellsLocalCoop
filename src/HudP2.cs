@@ -111,7 +111,14 @@ namespace LocalCoop
             if (_hud2 != null && ReferenceEquals(hud, _hud2) && P2 != null && !P2.destroyed)
             {
                 var s = EnterP2Scope();
-                try { act(); } finally { ExitP2Scope(s); }
+                try { act(); }
+                catch (Exception ex)
+                {
+                    // P2's HUD is cosmetic: an error in it is logged (once per kind) and skipped, never a crash.
+                    var key = ex.Message;
+                    if (_hud2Errors.Add(key)) Logger.Warning(ex, "[LocalCoop] P2 HUD error (skipped)");
+                }
+                finally { ExitP2Scope(s); }
             }
             else act();
         }
@@ -140,11 +147,9 @@ namespace LocalCoop
                 _hud2 = new HUD(game);       // the constructor sets HUD.ME = itself
                 game.hud = hud1;
                 HUD.Class.ME = me1;
-                // The minimap exists once, on P1's HUD. P2's HUD points at it so code reaching it through HUD.ME
-                // while P2 acts never finds null. Nothing else is shared: v0.3.0 also shared the counters and the
-                // HUD layout code crashed on them (bossCellCount is laid out inside its own HUD's flow).
-                // DetachShared() must run before P2's HUD is destroyed, or it destroys P1's minimap with it.
-                _hud2.minimap = hud1.minimap;
+                // Nothing is shared with P1's HUD (v0.3.0 shared counters, v0.3.1 the minimap: both crashed -
+                // the minimap is rebuilt on every area change and P2's HUD layout code corrupted it).
+                // P2's HUD has no minimap; the game null-checks that inside the HUD itself.
                 _hud2.initHero();
             }
             catch (Exception ex)
@@ -243,5 +248,6 @@ namespace LocalCoop
             }
         }
         private bool _layoutErrorLogged;
+        private readonly HashSet<string> _hud2Errors = new();
     }
 }
