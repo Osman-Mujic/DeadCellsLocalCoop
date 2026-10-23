@@ -8,7 +8,7 @@
     <ModName>DeadCellsLocalCoop</ModName>
     <ModType>mod</ModType>
     <ModMain>LocalCoop.LocalCoopMod</ModMain>
-    <Version>0.3.0</Version>
+    <Version>0.3.1</Version>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="DeadCellsCoreModding.MDK" Version="1.0.1" />

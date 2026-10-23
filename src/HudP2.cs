@@ -140,21 +140,17 @@ namespace LocalCoop
                 _hud2 = new HUD(game);       // the constructor sets HUD.ME = itself
                 game.hud = hud1;
                 HUD.Class.ME = me1;
-                // Shared, single-copy parts live on P1's HUD; P2's HUD points at them so any code that reaches
-                // them through HUD.ME while P2 acts finds the real (visible) objects instead of null/hidden ones.
+                // The minimap exists once, on P1's HUD. P2's HUD points at it so code reaching it through HUD.ME
+                // while P2 acts never finds null. Nothing else is shared: v0.3.0 also shared the counters and the
+                // HUD layout code crashed on them (bossCellCount is laid out inside its own HUD's flow).
+                // DetachShared() must run before P2's HUD is destroyed, or it destroys P1's minimap with it.
                 _hud2.minimap = hud1.minimap;
-                _hud2.moneyCount = hud1.moneyCount;
-                _hud2.cellsCount = hud1.cellsCount;
-                _hud2.killCount = hud1.killCount;
-                _hud2.goldCombo = hud1.goldCombo;
-                _hud2.debtCount = hud1.debtCount;
-                _hud2.bossCellCount = hud1.bossCellCount;
                 _hud2.initHero();
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, "[LocalCoop] Creating player 2 HUD failed");
-                try { _hud2?.destroy(); } catch { }
+                if (_hud2 != null) { DetachShared(_hud2); try { _hud2.destroy(); } catch { } }
                 _hud2 = null;
             }
             finally
@@ -180,7 +176,21 @@ namespace LocalCoop
             _hud2 = null;
             RestoreHud1Layout();
             if (hud2 == null) return;
-            try { if (!hud2.destroyed) hud2.destroy(); } catch (Exception ex) { Logger.Warning(ex, "[LocalCoop] Destroying P2 HUD failed"); }
+            DetachShared(hud2);
+            var me = HUD.Class.ME;
+            try { if (!hud2.destroyed) hud2.destroy(); }
+            finally
+            {
+                // HUD.onDispose clears HUD.ME if it pointed at the HUD being destroyed.
+                if (HUD.Class.ME == null || ReferenceEquals(HUD.Class.ME, hud2))
+                    HUD.Class.ME = ReferenceEquals(me, hud2) ? Game.Class.ME?.hud : me;
+            } catch (Exception ex) { Logger.Warning(ex, "[LocalCoop] Destroying P2 HUD failed"); }
+        }
+
+        /// <summary>Unlink P1's minimap from P2's HUD so destroying P2's HUD can't take it down too.</summary>
+        private static void DetachShared(HUD hud2)
+        {
+            try { hud2.minimap = null; } catch { }
         }
 
         private void RestoreHud1Layout()
