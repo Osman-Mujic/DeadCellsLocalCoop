@@ -179,12 +179,13 @@ namespace LocalCoop
             DetachShared(hud2);
             var me = HUD.Class.ME;
             try { if (!hud2.destroyed) hud2.destroy(); }
+            catch (Exception ex) { Logger.Warning(ex, "[LocalCoop] Destroying P2 HUD failed"); }
             finally
             {
                 // HUD.onDispose clears HUD.ME if it pointed at the HUD being destroyed.
                 if (HUD.Class.ME == null || ReferenceEquals(HUD.Class.ME, hud2))
                     HUD.Class.ME = ReferenceEquals(me, hud2) ? Game.Class.ME?.hud : me;
-            } catch (Exception ex) { Logger.Warning(ex, "[LocalCoop] Destroying P2 HUD failed"); }
+            }
         }
 
         /// <summary>Unlink P1's minimap from P2's HUD so destroying P2's HUD can't take it down too.</summary>
