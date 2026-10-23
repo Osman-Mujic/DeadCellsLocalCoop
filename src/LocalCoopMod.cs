@@ -56,6 +56,7 @@ namespace LocalCoop
         private bool _spawningP2;
         private bool _cleaningP2;
         private double _leashTimer;
+        private double _mirrorP1VisibilityUntil;
         private bool _toggleKeyWasDown;
 
         public override void Initialize()
@@ -147,7 +148,16 @@ namespace LocalCoop
             orig(self);
             if (_cleaningP2 || P2 == null || !ReferenceEquals(self, P1)) return;
             _cleaningP2 = true;
-            try { if (P2._level != null && !P2.destroyed) P2.clean(); }
+            try
+            {
+                var lvl = P2._level;
+                if (lvl != null && !P2.destroyed)
+                {
+                    int lx = lvl.lastHeroCX, ly = lvl.lastHeroCY;   // Hero.clean stores its own position there
+                    P2.clean();
+                    lvl.lastHeroCX = lx; lvl.lastHeroCY = ly;
+                }
+            }
             catch (Exception ex) { Logger.Warning(ex, "[LocalCoop] P2 clean on level exit failed"); }
             finally { _cleaningP2 = false; }
         }
@@ -173,8 +183,12 @@ namespace LocalCoop
                     p2.initGfx();
                     p2.setPosCase(cx, cy, null, null);
                     p2.cancelVelocities();
+                    try { p2.cancelMainSkills(null); } catch { }
                     p2.visible = true;
                 }
+                p2.set_sprAlpha(1.0);
+                // Door/level transitions fade "the hero" in by hand; P2 copies P1's visibility for a moment.
+                _mirrorP1VisibilityUntil = Clock.Now + 4.0;
                 p2.refillAllAmmo();
                 try { p2.onLevelChanged(oldLevel); } catch (Exception ex) { Logger.Warning(ex, "[LocalCoop] P2 onLevelChanged"); }
                 // New level: downed players get back up.
@@ -239,6 +253,11 @@ namespace LocalCoop
                     SpawnP2();
                 if (P2 == null) return;
 
+                if (Clock.Now < _mirrorP1VisibilityUntil && !_p2Down.Active && ReferenceEquals(p1._level, P2._level))
+                {
+                    P2.visible = p1.visible;
+                    P2.set_sprAlpha(p1.sprAlpha);
+                }
                 UpdateDowned(p1, P2, dt);
                 UpdateLeash(p1, P2, dt);
                 UpdateLootParity(dt);
@@ -311,27 +330,40 @@ namespace LocalCoop
         /// toward the partner, i.e. through space the player just crossed, so it can't push them
         /// into a wall.
         /// </summary>
+        /// <summary>
+        /// Keep both players on one screen: when they are <paramref name="maxSpan"/> cells apart, a player
+        /// walking further away is stopped at the edge. Walking back toward the partner is never blocked.
+        /// (v0.1.1-0.2.1 also snapped whoever moved; once the gap exceeded the limit, e.g. after the camera
+        /// zoom changed, every step either player took got undone and both were stuck.)
+        /// </summary>
         private void ClampHorizontalSpan(Hero p1, Hero p2, double maxSpan)
         {
             if (maxSpan < 6) return;
             double x1 = PosX(p1), x2 = PosX(p2);
-            double span = System.Math.Abs(x1 - x2);
-            if (span <= maxSpan) return;
-
-            // Pick the player pushing outward; if both or neither are, hold the one further from where
-            // the camera currently is (the midpoint), i.e. the one who moved last.
+            if (System.Math.Abs(x1 - x2) < maxSpan) return;
             Hero left = x1 < x2 ? p1 : p2, right = x1 < x2 ? p2 : p1;
-            bool leftOut = left.dx < -0.001, rightOut = right.dx > 0.001;
-            Hero mover = leftOut && !rightOut ? left : rightOut && !leftOut ? right
-                : (System.Math.Abs(left.dx) >= System.Math.Abs(right.dx) ? left : right);
-            Hero anchor = ReferenceEquals(mover, p1) ? p2 : p1;
+            double lx = PosX(left), rx = PosX(right);
+            HoldAtEdge(left, -1, rx - maxSpan);
+            HoldAtEdge(right, +1, lx + maxSpan);
+        }
 
-            double target = ReferenceEquals(mover, right) ? PosX(anchor) + maxSpan : PosX(anchor) - maxSpan;
+        /// <summary>
+        /// If <paramref name="h"/> is moving outward (-1 = left, +1 = right), cancel that velocity and ease
+        /// them back to <paramref name="limitX"/> (at most half a cell per frame, so a camera zoom change never
+        /// teleports anyone). A player moving inward, or standing still, is left alone.
+        /// </summary>
+        private static void HoldAtEdge(Hero h, int outward, double limitX)
+        {
+            bool movingOut = h.dx * outward > 0 || h.bdx * outward > 0;
+            if (!movingOut) return;
+            if (h.dx * outward > 0) h.dx = 0;
+            if (h.bdx * outward > 0) h.bdx = 0;
+            double x = PosX(h);
+            if ((x - limitX) * outward <= 0) return;
+            double target = outward > 0 ? System.Math.Max(limitX, x - 0.5) : System.Math.Min(limitX, x + 0.5);
             int cx = (int)System.Math.Floor(target);
-            mover.cx = cx;
-            mover.xr = target - cx;
-            mover.dx = 0;
-            mover.bdx = 0;
+            h.cx = cx;
+            h.xr = target - cx;
         }
 
         internal static string DescribeInventory(Hero h)
