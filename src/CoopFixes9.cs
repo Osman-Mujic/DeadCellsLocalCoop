@@ -14,12 +14,14 @@ namespace LocalCoop
     {
         private void InitCoopFixes9()
         {
-            // Boss arenas lock behind "the hero" (P1, cine.EnterRoomBoss & co. -> BossDoor.closeAndLock f@8875).
+            // Boss arenas lock behind the player who walked in (HiddenTrigger -> cine.EnterRoomBoss & co. -> BossDoor.closeAndLock f@8875).
             Hook_BossDoor.closeAndLock += (orig, self, cb) =>
             {
                 orig(self, cb);
                 if (!CoopActive) return;
-                try { BringPartnerThrough(self, P1); }
+                // Anchor: whoever stepped on the boss trigger (HiddenTrigger passes them to the entry cinematic).
+                var anchor = _lastTriggerHero != null && !_lastTriggerHero.destroyed ? _lastTriggerHero : P1;
+                try { BringPartnerThrough(self, anchor); }
                 catch (Exception ex) { Logger.Warning(ex, "[LocalCoop] Boss door regroup failed"); }
             };
 
