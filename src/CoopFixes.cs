@@ -34,6 +34,7 @@ namespace LocalCoop
             Hook_TierSelect.validate += (orig, self) => { _tierValidateDepth++; try { orig(self); } finally { _tierValidateDepth--; } };
             InitHudRouting();
             InitCoopFixes7();
+            InitCoopFixes8();
         }
 
         // ------------------------------------------------------------------ deaths

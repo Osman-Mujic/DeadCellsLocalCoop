@@ -162,6 +162,8 @@ namespace LocalCoop
             catch (Exception ex) { Logger.Warning(ex, "[LocalCoop] Loot parity snapshot failed"); copy = null; }
 
             if (item != null) { _ownedItems.AddOrUpdate(item, this); AddOwnedId(SafeId(item)); }
+            if (CoopActive && from is ItemDrop fromDrop && _reserved.TryGetValue(fromDrop, out _)) OnParityCopyPicked(from);
+            if (from is ItemAltar alt) _lastAltarPicker = self;
             _pickDepth++;
             try { RunAsPicker(self, () => orig(self, from, item, onComplete)); }
             finally { _pickDepth--; }
@@ -172,21 +174,8 @@ namespace LocalCoop
                     Logger.Information("[LocalCoop] {Who} took {Item} (no copy: {Why})", IsP2(self) ? "P2" : "P1", ItemId(item), why);
                 return;
             }
-            _spawningClone++;
-            try
-            {
-                bool inArmory = false;
-                var drop = new ItemDrop(lvl, cx, cy, copy, true, new HaxeProxy.Runtime.Ref<bool>(ref inArmory));
-                drop.init();
-                drop.setPosCase(cx, cy, xr, yr);
-                Reserve(drop, partner);
-                _noParity.AddOrUpdate(drop, this);
-                _parityCopies++;
-                Logger.Information("[LocalCoop] Loot parity: {Who} took {Item}; copy left for {Partner} (#{N})",
-                    IsP2(self) ? "P2" : "P1", ItemId(item), IsP2(partner) ? "P2" : "P1", _parityCopies);
-            }
-            catch (Exception ex) { Logger.Error(ex, "[LocalCoop] Loot parity copy failed"); }
-            finally { _spawningClone--; }
+            var drop = SpawnPartnerCopy(lvl, cx, cy, xr, yr, copy, partner, (IsP2(self) ? "P2" : "P1") + " took it");
+            if (drop != null && from is ItemAltar altar) _altarCopies.AddOrUpdate(altar, drop);
         }
 
         /// <summary>Everything already in either inventory counts as owned: dropping it later never copies it.</summary>

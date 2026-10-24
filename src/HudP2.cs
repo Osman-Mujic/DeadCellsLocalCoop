@@ -44,7 +44,7 @@ namespace LocalCoop
             Hook_HUD.showCanBeEquippedHighlightFor += (o, s, i) => Route(s, h => o(h, i));
             Hook_HUD.hideCanBeEquippedHighlight += (o, s) => Route(s, h => o(h));
             Hook_HUD.refreshItems += (o, s) => Route(s, h => o(h));
-            Hook_HUD.updateLifeSize += (o, s, m) => Route(s, h => o(h, m));
+            Hook_HUD.updateLifeSize += (o, s, m) => Route(s, h => UpdateLifeSizeCoop(o, h, m));
             Hook_HUD.updateSkillBgs += (o, s) => Route(s, h => o(h));
             Hook_HUD.updateInfection += (o, s, v, m, n) => Route(s, h => o(h, v, m, n));
             Hook_HUD.onItemPick += (o, s, i, x, y) => Route(s, h => o(h, i, x, y));
@@ -219,11 +219,7 @@ namespace LocalCoop
                     hud1.rightFlow.verticalAlign = new dc.h2d.FlowAlign.Bottom();
                     hud1.rightFlow.reflow();
                 }
-                if (hud1.minimapCont != null)
-                {
-                    hud1.minimapCont.visible = true;
-                    if (hud1.minimapCont.x <= MinimapParkX) { hud1.minimapCont.x = _minimapHomeX; hud1.minimapCont.posChanged = true; }
-                }
+                UnplaceMinimap(hud1);
             }
             catch { }
         }
@@ -231,7 +227,6 @@ namespace LocalCoop
         // Where P1's minimap is parked while hidden. It must keep being drawn: the map's fog of war is revealed
         // while it draws, so v0.4.0's "visible = false" left the full-screen map unexplored (playtest 7, bug 1).
         private const double MinimapParkX = -100000;
-        private double _minimapHomeX;
 
         private void ApplyHudLayout(HUD hud)
         {
@@ -252,7 +247,7 @@ namespace LocalCoop
                 {
                     // P1: money/cells/kills to the top-right (rightFlow spans the screen and aligns its
                     // content to the bottom; aligning it to the top moves the counters up), minimap off.
-                    ParkMinimap(hud);
+                    PlaceMinimap(hud);
                     // Per HUD instance: the game may build a new HUD for P1 at a biome change (playtest 7, bug 6).
                     if (!ReferenceEquals(_hud1Aligned, hud))
                     {
@@ -267,19 +262,39 @@ namespace LocalCoop
                 if (!_layoutErrorLogged) { _layoutErrorLogged = true; Logger.Warning(ex, "[LocalCoop] HUD layout failed"); }
             }
         }
-        private void ParkMinimap(HUD hud)
+        /// <summary>
+        /// P1's minimap sits in the top-left corner in co-op (playtest 8: "move it to the top left"). It lives in the
+        /// rightFlowR flow, which positions its children on every reflow, so it is marked absolute in that flow
+        /// and placed by hand. It must stay drawn: the fog of war is revealed while it draws (playtest 7, bug 1).
+        /// Its visibility is left to the game (boss fights hide it).
+        /// </summary>
+        private void PlaceMinimap(HUD hud)
         {
             var mc = hud.minimapCont;
-            if (mc == null) return;
-            mc.visible = true;
-            bool full = false;
-            try { full = hud.minimap != null && hud.minimap.isFullscreen; } catch { }
-            if (Config.ShowMinimap || full)
+            var parent = hud.rightFlowR;
+            if (mc == null || parent == null) return;
+            var props = parent.getProperties(mc);
+            if (props == null) return;
+            if (!props.isAbsolute) { props.isAbsolute = true; parent.reflow(); }
+            var win = dc.hxd.Window.Class.getInstance.Invoke();
+            double hm = System.Math.Ceiling(win.get_width() * 0.025);
+            double vm = System.Math.Ceiling(win.get_height() * 0.035);
+            double gx = Config.HideMinimap ? MinimapParkX : hm, gy = vm;
+            var pt = new dc.h2d.col.Point(new HaxeProxy.Runtime.Ref<double>(ref gx), new HaxeProxy.Runtime.Ref<double>(ref gy));
+            var loc = parent.globalToLocal(pt);
+            if (System.Math.Abs(mc.x - loc.x) > 0.5 || System.Math.Abs(mc.y - loc.y) > 0.5)
             {
-                if (mc.x <= MinimapParkX) { mc.x = _minimapHomeX; mc.posChanged = true; }
-                return;
+                mc.x = loc.x; mc.y = loc.y; mc.posChanged = true;
             }
-            if (mc.x > MinimapParkX) { _minimapHomeX = mc.x; mc.x = MinimapParkX; mc.posChanged = true; }
+        }
+
+        private void UnplaceMinimap(HUD hud)
+        {
+            var mc = hud.minimapCont;
+            var parent = hud.rightFlowR;
+            if (mc == null || parent == null) return;
+            var props = parent.getProperties(mc);
+            if (props != null && props.isAbsolute) { props.isAbsolute = false; parent.reflow(); }
         }
 
         private bool _layoutErrorLogged;

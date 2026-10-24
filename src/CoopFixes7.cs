@@ -13,7 +13,7 @@ namespace LocalCoop
 {
     /// <summary>
     /// Fixes from playtest 7: fountains, the forge, doors that close between the players, the flytrap bounce,
-    /// scroll tiers on P2's HUD, controller prompts stuck on keyboard, and a "regroup" button for P2.
+    /// scroll tiers on P2's HUD, controller prompts stuck on keyboard, and a regroup button (L3).
     /// </summary>
     public partial class LocalCoopMod
     {
@@ -137,35 +137,38 @@ namespace LocalCoop
             return System.Math.Max(n, n2);
         }
 
-        // ------------------------------------------------------------------ regroup button
-        // P2 holds Back/Select (the map button) for 1.5 s: P1 is brought to P2. Escape hatch for anything that
-        // splits the players (doors, one-way drops, elevators) the mod doesn't know about.
+        // ------------------------------------------------------------------ regroup button (L3)
+        // Either player clicks the left stick: the partner is brought to them. Escape hatch for anything that
+        // splits the players (doors closing behind one, one-way drops, elevators...). Playtest 8 asked for L3.
 
-        private double _regroupSince;
-        private bool _regroupDone;
+        private const int PadL3 = 10;   // GamePad index order: A B X Y Back Start LT RT LB RB L3 R3 ...
+        private bool _l3Was1, _l3Was2;
+
+        private bool _l3Checked;
 
         private void UpdateRegroup(Hero p1, Hero p2)
         {
-            var c2 = _input.P2Controller;
-            bool down = false;
-            try
+            if (!_l3Checked && _input.P1Controller != null)
             {
-                if (c2 != null && _input.P2Pad != null)
+                _l3Checked = true;
+                try
                 {
-                    var b = c2.get_bindings();
-                    int k = Convert.ToInt32(b.padA.getDyn(9));
-                    down = k >= 0 && c2.padIsDown(k);
+                    var b = _input.P1Controller.get_bindings();
+                    var used = new List<int>();
+                    foreach (var arr in new[] { b.padA, b.padB, b.padC })
+                        for (int i = 0; i < arr.length; i++) if (Convert.ToInt32(arr.getDyn(i)) == PadL3) used.Add(i);
+                    Logger.Information("[LocalCoop] L3 = regroup. Game actions also bound to L3: {Actions}", used.Count == 0 ? "none" : string.Join(",", used));
                 }
+                catch (Exception ex) { Logger.Warning(ex, "[LocalCoop] Checking L3 bindings failed"); }
             }
-            catch { down = false; }
-            if (!down) { _regroupSince = 0; _regroupDone = false; return; }
-            if (_regroupDone) return;
-            if (_regroupSince <= 0) { _regroupSince = Clock.Now; return; }
-            if (Clock.Now - _regroupSince < 1.5) return;
-            _regroupDone = true;
-            if (!ReferenceEquals(p1._level, p2._level) || _p2Down.Active || _p1Down.Active || p2.life <= 0) return;
-            MoveTo(p1, p2);
-            Logger.Information("[LocalCoop] Regroup: P1 brought to P2");
+            bool d1 = CoopInput.PadDown(_input.P1Pad, PadL3);
+            bool d2 = CoopInput.PadDown(_input.P2Pad, PadL3);
+            bool press1 = d1 && !_l3Was1, press2 = d2 && !_l3Was2;
+            _l3Was1 = d1; _l3Was2 = d2;
+            if (!press1 && !press2) return;
+            if (!ReferenceEquals(p1._level, p2._level) || _p2Down.Active || _p1Down.Active || p1.life <= 0 || p2.life <= 0) return;
+            if (press1) { MoveTo(p2, p1); Logger.Information("[LocalCoop] Regroup (P1 L3): P2 brought to P1"); }
+            else { MoveTo(p1, p2); Logger.Information("[LocalCoop] Regroup (P2 L3): P1 brought to P2"); }
         }
 
         // ------------------------------------------------------------------ HUD upkeep (every frame)
@@ -214,21 +217,11 @@ namespace LocalCoop
         // Pressing a key (e.g. Esc) switches P1's button prompts to keyboard; the game's switch back to pad
         // prompts didn't fire with P1 pinned to one pad (playtest 7, bug 3). Any activity on P1's pad switches back.
 
-        private double _p1PadActivity = -1;
-
         private void UpdatePromptMode()
         {
-            var c1 = _input.P1Controller;
-            var pad = _input.P1Pad;
-            if (c1 == null || pad == null || pad.device == null) { _p1PadActivity = -1; return; }
-            double act = pad.lastActivity;
-            if (_p1PadActivity < 0) { _p1PadActivity = act; return; }
-            if (act == _p1PadActivity) return;
-            _p1PadActivity = act;
-            if (c1.mainMode is not MainMode.MM_Keyboard) return;
-            c1.mainMode = new MainMode.MM_Gamepad();
-            try { c1.onChange?.Invoke(); } catch { }
-            if (Config.Verbose) Logger.Information("[LocalCoop] P1 prompts back to gamepad");
+            // Any button on P1's pad: pad icons (pressing a key switches them to keyboard through the game itself).
+            if (_input.P1Pad != null && CoopInput.AnyButtonDown(_input.P1Pad) && _input.SetP1PadPrompts() && Config.Verbose)
+                Logger.Information("[LocalCoop] P1 prompts back to gamepad");
         }
     }
 }

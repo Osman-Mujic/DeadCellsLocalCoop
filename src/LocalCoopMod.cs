@@ -33,8 +33,10 @@ namespace LocalCoop
         public bool LootParity { get; set; } = true;
         /// <summary>Show player 2's health, flasks and items in the bottom-right corner.</summary>
         public bool P2Hud { get; set; } = true;
-        /// <summary>Show the corner minimap in co-op (off: the game's full-screen map button still works).</summary>
+        /// <summary>Old setting (v0.3-v0.5), no longer used: the minimap is shown top-left in co-op.</summary>
         public bool ShowMinimap { get; set; } = false;
+        /// <summary>Hide the corner minimap in co-op (it keeps recording explored areas; the map button still works).</summary>
+        public bool HideMinimap { get; set; } = false;
         /// <summary>Write extra diagnostics to the DCCM log.</summary>
         public bool Verbose { get; set; } = true;
     }
@@ -276,6 +278,7 @@ namespace LocalCoop
                 UpdateTeleportFollow(p1, P2);
                 UpdateLeash(p1, P2, dt);
                 UpdateRegroup(p1, P2);
+                UpdateP2Pause(P2);
                 UpdateHudUpkeep(p1, P2);
                 UpdatePromptMode();
                 UpdateLootParity(dt);
