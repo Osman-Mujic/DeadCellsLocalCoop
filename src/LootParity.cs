@@ -3,6 +3,7 @@ using dc;
 using dc.en;
 using dc.en.inter;
 using dc.tool;
+using dc.ui;
 
 namespace LocalCoop
 {
@@ -35,6 +36,13 @@ namespace LocalCoop
             Hook_ItemDrop.canBeActivated += Hook_ItemDrop_canBeActivated;
             Hook__ItemDrop.__constructor__ += Hook_ItemDrop_ctor;
             Hook_ShopBooth.onActivate += Hook_ShopBooth_onActivate;
+            Hook_ShopBooth.buy += (orig, self, by, r) => { _shopDepth++; try { orig(self, by, r); } finally { _shopDepth--; } };
+            Hook__ReplaceItem.__constructor__ += (o, s, a, b, c) => { _pickUisOpen++; o(s, a, b, c); };
+            Hook_ReplaceItem.onDispose += (o, s) => { o(s); if (_pickUisOpen > 0) _pickUisOpen--; };
+            Hook__ReplaceSingleItem.__constructor__ += (o, s, a, b, c, d, e) => { _pickUisOpen++; o(s, a, b, c, d, e); };
+            Hook_ReplaceSingleItem.onDispose += (o, s) => { o(s); if (_pickUisOpen > 0) _pickUisOpen--; };
+            Hook__ReplaceItemWithDual.__constructor__ += (o, s, a, b, c, d) => { _pickUisOpen++; o(s, a, b, c, d); };
+            Hook_ReplaceItemWithDual.onDispose += (o, s) => { o(s); if (_pickUisOpen > 0) _pickUisOpen--; };
             Hook_RandomWeaponSpawner.spawnItem += Hook_RandomWeaponSpawner_spawnItem;
             Hook_Entity.canHaveRepellingWith += Hook_Entity_canHaveRepellingWith;
             Hook_Hero.dropAndUpdateItem += (orig, self, i) =>
@@ -48,7 +56,7 @@ namespace LocalCoop
             InitArmoryHooks();
         }
 
-        private void UpdateLootParity(double dt) { }
+        private void UpdateLootParity(double dt) => UpdatePendingPicks();
 
         private bool IsOwnedId(int id) => id > 0 && _ownedIds.Contains(id);
         private void AddOwnedId(int id) { if (id > 0) _ownedIds.Add(id); }
@@ -149,6 +157,7 @@ namespace LocalCoop
                     if (partner == null || partner.destroyed) why = "no partner";
                     else if (!IsParityItem(item)) why = "not per-player";
                     else if (from is ItemDrop d && _reserved.TryGetValue(d, out _)) why = "reserved/copy";
+                    else if (from is ShopBooth || _shopDepth > 0) why = "bought in a shop";
                     else if (_noParity.TryGetValue(from, out _)) why = "shop/pipe/dropped";
                     else if (_ownedItems.TryGetValue(item, out _) || IsOwnedId(SafeId(item))) why = "already owned";
                     else
@@ -161,21 +170,74 @@ namespace LocalCoop
             }
             catch (Exception ex) { Logger.Warning(ex, "[LocalCoop] Loot parity snapshot failed"); copy = null; }
 
+            bool wasOwned = item != null && (_ownedItems.TryGetValue(item, out _) || IsOwnedId(SafeId(item)));
             if (item != null) { _ownedItems.AddOrUpdate(item, this); AddOwnedId(SafeId(item)); }
-            if (CoopActive && from is ItemDrop fromDrop && _reserved.TryGetValue(fromDrop, out _)) OnParityCopyPicked(from);
-            if (from is ItemAltar alt) _lastAltarPicker = self;
+            if (from is ItemAltar) _lastAltarPicker = self;
+            if (from != null) _pendingCopies.RemoveAll(q => CoopInput.Ptr(q.From) == CoopInput.Ptr(from));
             _pickDepth++;
             try { RunAsPicker(self, () => orig(self, from, item, onComplete)); }
             finally { _pickDepth--; }
 
-            if (copy == null || lvl == null || partner == null)
+            if (from == null || item == null) return;
+            // The pick may still be undecided (replace-item screen, shop confirmation). The partner's copy, and
+            // anything else that assumes the item was taken, waits until it really was (playtest 9: declining a
+            // shop preview or a swap left a copy every time -> endless copies).
+            var pending = new PendingPick
             {
-                if (Config.Verbose && CoopActive && item != null)
-                    Logger.Information("[LocalCoop] {Who} took {Item} (no copy: {Why})", IsP2(self) ? "P2" : "P1", ItemId(item), why);
+                From = from, Item = item, Picker = self, Partner = partner, Copy = copy, Lvl = lvl,
+                Cx = cx, Cy = cy, Xr = xr, Yr = yr, Since = Clock.Now, WasOwned = wasOwned, Why = why,
+            };
+            if (PickTaken(pending)) FinishPick(pending);
+            else _pendingCopies.Add(pending);
+        }
+
+        private sealed class PendingPick
+        {
+            public Entity From = null!; public InventItem Item = null!; public Hero Picker = null!; public Hero? Partner;
+            public InventItem? Copy; public dc.pr.Level? Lvl; public int Cx, Cy; public double Xr, Yr, Since;
+            public bool WasOwned; public string Why = "";
+        }
+        private readonly List<PendingPick> _pendingCopies = new();
+        private int _pickUisOpen;
+
+        private bool PickTaken(PendingPick p)
+        {
+            try
+            {
+                if (p.From.destroyed) return true;
+                if (p.From is ItemDrop d && CoopInput.Ptr(d.item) != CoopInput.Ptr(p.Item)) return true;
+                if (p.From is ItemAltar a && !a.isEnabled) return true;
+                if (p.From is ShopBooth b && CoopInput.Ptr(b.item) != CoopInput.Ptr(p.Item)) return true;
+                return Owns(p.Picker, p.Item);
+            }
+            catch { return false; }
+        }
+
+        private void FinishPick(PendingPick p)
+        {
+            if (CoopActive && p.From is ItemDrop fromDrop && _reserved.TryGetValue(fromDrop, out _)) OnParityCopyPicked(p.From);
+            if (p.Copy == null || p.Lvl == null || p.Partner == null || p.Partner.destroyed)
+            {
+                if (Config.Verbose && CoopActive)
+                    Logger.Information("[LocalCoop] {Who} took {Item} (no copy: {Why})", IsP2(p.Picker) ? "P2" : "P1", ItemId(p.Item), p.Why);
                 return;
             }
-            var drop = SpawnPartnerCopy(lvl, cx, cy, xr, yr, copy, partner, (IsP2(self) ? "P2" : "P1") + " took it");
-            if (drop != null && from is ItemAltar altar) _altarCopies.AddOrUpdate(altar, drop);
+            var drop = SpawnPartnerCopy(p.Lvl, p.Cx, p.Cy, p.Xr, p.Yr, p.Copy, p.Partner, (IsP2(p.Picker) ? "P2" : "P1") + " took it");
+            if (drop != null && p.From is ItemAltar altar) _altarCopies.AddOrUpdate(altar, drop);
+        }
+
+        private void UpdatePendingPicks()
+        {
+            for (int i = _pendingCopies.Count - 1; i >= 0; i--)
+            {
+                var p = _pendingCopies[i];
+                if (PickTaken(p)) { _pendingCopies.RemoveAt(i); FinishPick(p); continue; }
+                // Undecided while a pick menu is open; once all are closed and the item is still where it was, it was declined.
+                if (_pickUisOpen > 0 || Clock.Now - p.Since < 0.5) continue;
+                _pendingCopies.RemoveAt(i);
+                if (!p.WasOwned) { _ownedItems.Remove(p.Item); _ownedIds.Remove(SafeId(p.Item)); }
+                if (Config.Verbose) Logger.Information("[LocalCoop] {Who} put {Item} back (declined): no copy", IsP2(p.Picker) ? "P2" : "P1", ItemId(p.Item));
+            }
         }
 
         /// <summary>Everything already in either inventory counts as owned: dropping it later never copies it.</summary>

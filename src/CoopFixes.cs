@@ -35,6 +35,7 @@ namespace LocalCoop
             InitHudRouting();
             InitCoopFixes7();
             InitCoopFixes8();
+            InitCoopFixes9();
         }
 
         // ------------------------------------------------------------------ deaths
