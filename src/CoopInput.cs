@@ -62,8 +62,11 @@ namespace LocalCoop
 
             if (pads.Count >= 2 && !LocalCoopMod.Config.P2UsesFirstPad)
             {
-                P1Pad = pads[0];
-                P2Pad = pads[1];
+                // Physical order (device index) is fixed per controller; SwapPads (chosen in game with Back+Start,
+                // saved in the config) flips which one is player 1.
+                bool swap = LocalCoopMod.Config.SwapPads;
+                P1Pad = swap ? pads[1] : pads[0];
+                P2Pad = swap ? pads[0] : pads[1];
                 P1Controller.gc = P1Pad;     // P1: keyboard + pad 1
             }
             else if (pads.Count >= 1)
@@ -87,9 +90,7 @@ namespace LocalCoop
             P2Controller.gc = P2Pad;
             if (PadMode is null) CaptureModes();
             _log.Information("[LocalCoop] Pads: {Count} connected. P1={P1} P2={P2}",
-                pads.Count,
-                P1Pad == null ? "keyboard" : $"pad#{P1Pad.device.index}",
-                P2Pad == null ? "none" : $"pad#{P2Pad.device.index}");
+                pads.Count, Describe(P1Pad, "keyboard"), Describe(P2Pad, "none"));
         }
 
         /// <summary>Hand all pads back to player 1 (co-op switched off).</summary>
@@ -103,6 +104,28 @@ namespace LocalCoop
         }
 
         public bool HasP2Input => P2Pad != null;
+
+        private static string Describe(GamePad? p, string none)
+        {
+            if (p?.device == null) return none;
+            string name = "";
+            try { name = p.device.get_name()?.ToString() ?? ""; } catch { }
+            return $"pad#{p.device.index} ({name})";
+        }
+
+        /// <summary>Swap which controller is player 1 (saved). Returns false when fewer than two pads are connected.</summary>
+        public bool SwapPads()
+        {
+            if (P1Pad == null || P2Pad == null) return false;
+            LocalCoopMod.Config.SwapPads = !LocalCoopMod.Config.SwapPads;
+            Refresh(force: true);
+            return true;
+        }
+
+        public static void Rumble(GamePad? p, double strength, double seconds)
+        {
+            try { p?.device?.rumble(strength, seconds); } catch { }
+        }
 
         // ---------------------------------------------------------------- prompt mode (keyboard / gamepad icons)
         // Haxe enum values without arguments are singletons and the game compares them by pointer

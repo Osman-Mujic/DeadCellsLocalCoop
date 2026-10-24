@@ -37,6 +37,7 @@ namespace LocalCoop
             InitCoopFixes8();
             InitCoopFixes9();
             InitKeyRing();
+            InitStyleHooks();
         }
 
         // ------------------------------------------------------------------ deaths

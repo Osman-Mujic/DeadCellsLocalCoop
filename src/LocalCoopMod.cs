@@ -37,6 +37,11 @@ namespace LocalCoop
         public bool ShowMinimap { get; set; } = false;
         /// <summary>Hide the corner minimap in co-op (it keeps recording explored areas; the map button still works).</summary>
         public bool HideMinimap { get; set; } = false;
+        /// <summary>Which of the two controllers is player 1 (toggled in game: hold Back+Start on a controller, or F10).</summary>
+        public bool SwapPads { get; set; } = false;
+        /// <summary>Player 2's own outfit and head (chosen in the outfit room / head room by P2). Empty = same as P1.</summary>
+        public string P2Skin { get; set; } = "";
+        public string P2Head { get; set; } = "";
         /// <summary>Write extra diagnostics to the DCCM log.</summary>
         public bool Verbose { get; set; } = true;
     }
@@ -259,6 +264,7 @@ namespace LocalCoop
             {
                 HandleToggleKey();
                 if (_input.EnsureCreated()) _input.Refresh();
+                UpdatePadPicker();
 
                 var p1 = P1;
                 if (p1 == null || p1.destroyed || p1._level == null)
@@ -274,6 +280,7 @@ namespace LocalCoop
                     P2.visible = p1.visible;
                     P2.set_sprAlpha(p1.sprAlpha);
                 }
+                if (_p1SkinSaved == null) KeepCameraOnPlayers();
                 UpdateDowned(p1, P2, dt);
                 UpdateTeleportFollow(p1, P2);
                 UpdateLeash(p1, P2, dt);
