@@ -18,7 +18,7 @@ namespace LocalCoop
     {
         private HUD? _hud2;
         private int _p2ActDepth;   // > 0 while P2's own code runs (update, pick, menus)
-        private bool _hud1TopAligned;
+        private HUD? _hud1Aligned;
 
         private void InitHud2Hooks()
         {
@@ -170,7 +170,15 @@ namespace LocalCoop
         private void RefreshHud2()
         {
             var hud2 = _hud2;
-            if (hud2 == null || hud2.destroyed || P2 == null) return;
+            if (P2 == null) return;
+            if (Config.P2Hud && (hud2 == null || hud2.destroyed))
+            {
+                // The game tore down its processes (end of a biome): build P2's HUD again.
+                Logger.Information("[LocalCoop] P2 HUD was gone after a level change: rebuilding it");
+                CreateHud2();
+                return;
+            }
+            if (hud2 == null) return;
             try { AsHudOwner(hud2, () => { hud2.initHero(); hud2.show(null); }); }
             catch (Exception ex) { Logger.Warning(ex, "[LocalCoop] Refreshing player 2 HUD failed"); }
         }
@@ -201,18 +209,29 @@ namespace LocalCoop
 
         private void RestoreHud1Layout()
         {
-            if (!_hud1TopAligned) return;
-            _hud1TopAligned = false;
+            var hud1 = _hud1Aligned;
+            _hud1Aligned = null;
+            if (hud1 == null || hud1.destroyed) return;
             try
             {
-                var hud1 = Game.Class.ME?.hud;
-                if (hud1?.rightFlow == null) return;
-                hud1.rightFlow.verticalAlign = new dc.h2d.FlowAlign.Bottom();
-                if (hud1.minimapCont != null) hud1.minimapCont.visible = true;
-                hud1.rightFlow.reflow();
+                if (hud1.rightFlow != null)
+                {
+                    hud1.rightFlow.verticalAlign = new dc.h2d.FlowAlign.Bottom();
+                    hud1.rightFlow.reflow();
+                }
+                if (hud1.minimapCont != null)
+                {
+                    hud1.minimapCont.visible = true;
+                    if (hud1.minimapCont.x <= MinimapParkX) { hud1.minimapCont.x = _minimapHomeX; hud1.minimapCont.posChanged = true; }
+                }
             }
             catch { }
         }
+
+        // Where P1's minimap is parked while hidden. It must keep being drawn: the map's fog of war is revealed
+        // while it draws, so v0.4.0's "visible = false" left the full-screen map unexplored (playtest 7, bug 1).
+        private const double MinimapParkX = -100000;
+        private double _minimapHomeX;
 
         private void ApplyHudLayout(HUD hud)
         {
@@ -224,7 +243,7 @@ namespace LocalCoop
                     int w = dc.hxd.Window.Class.getInstance.Invoke().get_width();
                     double hm = System.Math.Ceiling(w * 0.025);
                     var lf = hud.leftFlow;
-                    if (lf != null) lf.x = w - lf.get_outerWidth() - hm;
+                    if (lf != null) { double x = w - lf.get_outerWidth() - hm; if (lf.x != x) { lf.x = x; lf.posChanged = true; } }
                     if (hud.rightFlow != null) hud.rightFlow.visible = false;
                     if (hud.topRightFlow != null) hud.topRightFlow.visible = false;
                     if (hud.bossLifebar != null) hud.bossLifebar.visible = false;
@@ -233,12 +252,13 @@ namespace LocalCoop
                 {
                     // P1: money/cells/kills to the top-right (rightFlow spans the screen and aligns its
                     // content to the bottom; aligning it to the top moves the counters up), minimap off.
-                    if (hud.minimapCont != null) hud.minimapCont.visible = Config.ShowMinimap;
-                    if (!_hud1TopAligned)
+                    ParkMinimap(hud);
+                    // Per HUD instance: the game may build a new HUD for P1 at a biome change (playtest 7, bug 6).
+                    if (!ReferenceEquals(_hud1Aligned, hud))
                     {
                         hud.rightFlow.verticalAlign = new dc.h2d.FlowAlign.Top();
                         hud.rightFlow.reflow();
-                        _hud1TopAligned = true;
+                        _hud1Aligned = hud;
                     }
                 }
             }
@@ -247,6 +267,21 @@ namespace LocalCoop
                 if (!_layoutErrorLogged) { _layoutErrorLogged = true; Logger.Warning(ex, "[LocalCoop] HUD layout failed"); }
             }
         }
+        private void ParkMinimap(HUD hud)
+        {
+            var mc = hud.minimapCont;
+            if (mc == null) return;
+            mc.visible = true;
+            bool full = false;
+            try { full = hud.minimap != null && hud.minimap.isFullscreen; } catch { }
+            if (Config.ShowMinimap || full)
+            {
+                if (mc.x <= MinimapParkX) { mc.x = _minimapHomeX; mc.posChanged = true; }
+                return;
+            }
+            if (mc.x > MinimapParkX) { _minimapHomeX = mc.x; mc.x = MinimapParkX; mc.posChanged = true; }
+        }
+
         private bool _layoutErrorLogged;
         private readonly HashSet<string> _hud2Errors = new();
     }

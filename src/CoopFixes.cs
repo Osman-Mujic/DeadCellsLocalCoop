@@ -33,6 +33,7 @@ namespace LocalCoop
             Hook_CarnivorousPlant.fixedUpdate += Hook_CarnivorousPlant_fixedUpdate;
             Hook_TierSelect.validate += (orig, self) => { _tierValidateDepth++; try { orig(self); } finally { _tierValidateDepth--; } };
             InitHudRouting();
+            InitCoopFixes7();
         }
 
         // ------------------------------------------------------------------ deaths
@@ -208,10 +209,17 @@ namespace LocalCoop
             double px = self.cx + self.xr, py = self.cy + self.yr;
             double d1 = Sq(p1.cx + p1.xr - px) + Sq(p1.cy + p1.yr - py);
             double d2 = Sq(p2.cx + p2.xr - px) + Sq(p2.cy + p2.yr - py);
-            if (d2 < d1 || _p1Down.Active) WithHero(p2, () => orig(self));
+            // Whoever is standing on / right above the plant wins; otherwise the closest (playtest 7: P2 standing
+            // on the closed plant didn't bounce because P1, next to it, was closer to its centre).
+            bool on1 = OnPlant(self, p1), on2 = OnPlant(self, p2);
+            bool useP2 = on2 != on1 ? on2 : d2 < d1;
+            if (useP2 || _p1Down.Active) WithHero(p2, () => orig(self));
             else orig(self);
         }
 
         private static double Sq(double v) => v * v;
+
+        private static bool OnPlant(CarnivorousPlant p, Hero h) =>
+            System.Math.Abs(h.cx + h.xr - (p.cx + p.xr)) <= 2.0 && h.cy <= p.cy && h.cy >= p.cy - 4;
     }
 }

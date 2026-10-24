@@ -275,6 +275,9 @@ namespace LocalCoop
                 UpdateDowned(p1, P2, dt);
                 UpdateTeleportFollow(p1, P2);
                 UpdateLeash(p1, P2, dt);
+                UpdateRegroup(p1, P2);
+                UpdateHudUpkeep(p1, P2);
+                UpdatePromptMode();
                 UpdateLootParity(dt);
                 if (CoopTestBot.Enabled) CoopTestBot.Tick(this, dt);
             }

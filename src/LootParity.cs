@@ -73,7 +73,8 @@ namespace LocalCoop
             {
                 // Scrolls of power, scroll fragments and food are per player; keys and money are not.
                 var id = ItemId(item);
-                return id.EndsWith("Tier", StringComparison.Ordinal) || id == "QuarterUp"
+                // FlaskRefill: the single vial left by the fountain on higher difficulties - one each.
+                return id.EndsWith("Tier", StringComparison.Ordinal) || id == "QuarterUp" || id == "FlaskRefill"
                     || id.Contains("Food", StringComparison.Ordinal) || id.Contains("Meat", StringComparison.Ordinal);
             }
             return false;
