@@ -31,6 +31,8 @@ namespace LocalCoop
                 RunPendingScrolls();
             };
             Hook_CarnivorousPlant.fixedUpdate += Hook_CarnivorousPlant_fixedUpdate;
+            Hook_TierSelect.validate += (orig, self) => { _tierValidateDepth++; try { orig(self); } finally { _tierValidateDepth--; } };
+            InitHudRouting();
         }
 
         // ------------------------------------------------------------------ deaths
@@ -66,6 +68,7 @@ namespace LocalCoop
         private bool _p2Teleporting;
         private MiniMap? _mmSwapped;
         private ControllerAccess? _mmSavedController;
+        private ControllerAccess? _mmP2Access;
 
         /// <summary>The map that picks a teleporter destination reads its own controller; give it P2's pad when P2 used the teleporter.</summary>
         private void Hook_Teleport_onActivate(Hook_Teleport.orig_onActivate orig, Teleport self, Hero by, bool lp)
@@ -82,9 +85,14 @@ namespace LocalCoop
             if (!_p2Teleporting) return;
             try
             {
+                // The full-screen map holds an EXCLUSIVE access on P1's controller (MiniMap.fullscreen f@3314);
+                // MiniMap.restore releases whatever access the map holds at that moment. Swapping without
+                // releasing left P1 locked after P2 teleported (playtest 6, bug 5) - same as the old menu freeze.
                 _mmSavedController = self.controller;
                 _mmSwapped = self;
-                self.controller = _input.CreateP2Access();
+                try { _mmSavedController?.dispose(default); } catch { }
+                _mmP2Access = _input.CreateP2Access(exclusive: true);
+                self.controller = _mmP2Access;
                 if (Config.Verbose) Logger.Information("[LocalCoop] Teleport destination: P2 chooses");
             }
             catch (Exception ex) { Logger.Warning(ex, "[LocalCoop] Giving P2 the teleport map failed"); }
@@ -100,9 +108,11 @@ namespace LocalCoop
         private void RestoreMinimapControls(MiniMap mm)
         {
             if (_mmSwapped == null || !ReferenceEquals(mm, _mmSwapped)) return;
+            try { _mmP2Access?.dispose(default); } catch { }   // free P2's controller too
             try { if (_mmSavedController != null) mm.controller = _mmSavedController; } catch { }
             _mmSwapped = null;
             _mmSavedController = null;
+            _mmP2Access = null;
         }
 
         // Teleports (statues, runes, cursed doors...) move one hero far in a single frame. Instead of the leash
@@ -149,11 +159,12 @@ namespace LocalCoop
         private readonly Queue<PendingScroll> _pendingScrolls = new();
         private int _tierSelectsOpen;
         private int _partnerScrollDepth;
+        private int _tierValidateDepth;   // the stat a choice-scroll grants is a result, not a new scroll
 
         private void Hook_Hero_applyItemPickEffect(Hook_Hero.orig_applyItemPickEffect orig, Hero self, Entity from, InventItem item)
         {
             string id = ItemId(item);
-            if (!CoopActive || _partnerScrollDepth > 0 || !IsScrollId(id))
+            if (!CoopActive || _partnerScrollDepth > 0 || _tierValidateDepth > 0 || !IsScrollId(id))
             {
                 RunAsPicker(self, () => orig(self, from, item));
                 return;

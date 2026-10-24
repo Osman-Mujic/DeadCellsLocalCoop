@@ -49,7 +49,21 @@ namespace LocalCoop
 
         /// <summary>The second player's hero. Null when co-op is inactive.</summary>
         internal Hero? P2 { get; private set; }
-        internal static Hero? P1 => Game.Class.ME?.hero;
+        /// <summary>
+        /// Player 1's hero. Not simply game.hero: during "P2's turn" game.hero points at P2, and v0.3.2 then
+        /// treated P2 as P1 (a scroll chosen by P2 was handed to P2 a second time).
+        /// </summary>
+        internal Hero? P1
+        {
+            get
+            {
+                var g = Game.Class.ME?.hero;
+                if (g != null && !ReferenceEquals(g, P2)) _p1Ref = g;
+                if (_p1Ref != null && _p1Ref.destroyed) _p1Ref = null;
+                return _p1Ref ?? (ReferenceEquals(g, P2) ? null : g);
+            }
+        }
+        private Hero? _p1Ref;
 
         private readonly DownState _p1Down = new();
         private readonly DownState _p2Down = new();
