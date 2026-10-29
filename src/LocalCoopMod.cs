@@ -39,6 +39,8 @@ namespace LocalCoop
         public bool HideMinimap { get; set; } = false;
         /// <summary>Which of the two controllers is player 1 (toggled in game: hold Back+Start on a controller, or F10).</summary>
         public bool SwapPads { get; set; } = false;
+        /// <summary>Set once the players picked their sides on the "Choose your side" screen (it then stops opening by itself).</summary>
+        public bool SidesChosen { get; set; } = false;
         /// <summary>Player 2's own outfit and head (chosen in the outfit room / head room by P2). Empty = same as P1.</summary>
         public string P2Skin { get; set; } = "";
         public string P2Head { get; set; } = "";
@@ -79,6 +81,7 @@ namespace LocalCoop
         private double _leashTimer;
         private double _mirrorP1VisibilityUntil;
         private bool _toggleKeyWasDown;
+        private bool _openSidesNextFrame;
 
         public override void Initialize()
         {
@@ -124,6 +127,8 @@ namespace LocalCoop
                 MarkInventoryOwned(p1);
                 MarkInventoryOwned(p2);
                 CreateHud2();
+                // First co-op run: let the players pick their sides, then show the co-op controls.
+                if (!Config.SidesChosen && _input.AllConnectedPads().Count >= 2) _openSidesNextFrame = true;
                 Logger.Information("[LocalCoop] Player 2 spawned in {Level} at {Cx},{Cy} life={Life}/{Max} items={Items}",
                     lvl.map?.id?.ToString(), p1.cx, p1.cy, p2.life, p2.maxLife, DescribeInventory(p2));
             }
@@ -264,7 +269,8 @@ namespace LocalCoop
             {
                 HandleToggleKey();
                 if (_input.EnsureCreated()) _input.Refresh();
-                UpdatePadPicker();
+                UpdateScreens();
+                if (!ScreenOpen) UpdatePadPicker();
 
                 var p1 = P1;
                 if (p1 == null || p1.destroyed || p1._level == null)
@@ -274,6 +280,7 @@ namespace LocalCoop
                 if (P2 == null && Config.AutoSpawnP2 && _input.HasP2Input && !_spawningP2 && IsRunLevel(p1._level))
                     SpawnP2();
                 if (P2 == null) return;
+                if (_openSidesNextFrame && !ScreenOpen) { _openSidesNextFrame = false; OpenSidesScreen(thenControls: true); }
 
                 if (Clock.Now < _mirrorP1VisibilityUntil && !_p2Down.Active && ReferenceEquals(p1._level, P2._level))
                 {
@@ -284,8 +291,11 @@ namespace LocalCoop
                 UpdateDowned(p1, P2, dt);
                 UpdateTeleportFollow(p1, P2);
                 UpdateLeash(p1, P2, dt);
-                UpdateRegroup(p1, P2);
-                UpdateP2Pause(P2);
+                if (!ScreenOpen)
+                {
+                    UpdateRegroup(p1, P2);
+                    UpdateP2Pause(P2);
+                }
                 UpdateHudUpkeep(p1, P2);
                 UpdatePromptMode();
                 UpdateLootParity(dt);

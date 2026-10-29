@@ -105,6 +105,17 @@ namespace LocalCoop
 
         public bool HasP2Input => P2Pad != null;
 
+        /// <summary>Connected pads in device order (the same order Refresh uses before SwapPads).</summary>
+        public List<GamePad> AllConnectedPads()
+        {
+            var pads = new List<GamePad>();
+            if (P1Controller == null) return pads;
+            foreach (var o in P1Controller.allGamepads)
+                if (o is GamePad gp && gp.device != null && gp.device.connected) pads.Add(gp);
+            pads.Sort((a, b) => a.device.index.CompareTo(b.device.index));
+            return pads;
+        }
+
         private static string Describe(GamePad? p, string none)
         {
             if (p?.device == null) return none;

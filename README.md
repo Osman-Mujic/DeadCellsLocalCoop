@@ -44,17 +44,23 @@ To uninstall, delete the `DeadCellsLocalCoop` folder.
 
 | Action | How |
 |---|---|
-| Choose which controller is player 1 | Hold **Back + Start** for one second on the controller that should be player 1 (saved). **F10** swaps from the keyboard. |
+| Choose which controller is player 1 | The **Choose your side** screen opens on your first co-op run. Each player pushes their stick left (player 1) or right (player 2) and presses **A**. Open it again any time by holding **Back + Start** for one second, or from Options. **F10** swaps from the keyboard. |
 | Regroup | **L3** (click left stick): your partner is brought to you. |
 | Player 2 pause / inventory | **Start** on player 2's controller. |
 | Map | Player 1's map button (the minimap is in the top-left corner). |
 | Add / remove player 2 | **F9** |
 
+## In-game pages
+
+`Options > Core Modding > Local Co-op` has **Choose controllers**, **Co-op controls** (the extra buttons, with your
+controller's button icons) and the main settings as toggles. The controls page also opens by itself after you
+choose sides the first time.
+
 ## Settings
 
 `<Dead Cells folder>\coremod\config\DeadCellsLocalCoop.json` (created on first start). Useful keys:
 `SharedCamera`, `KeepBothOnScreen`, `LootParity`, `P2Hud`, `HideMinimap`, `ReviveSeconds`, `ReviveLifeFraction`,
-`SwapPads`, `P2Skin`/`P2Head` (player 2's outfit and head, set from the outfit room), `Verbose` (extra log lines in
+`SwapPads`, `SidesChosen` (set to false to see the side screen again), `P2Skin`/`P2Head` (player 2's outfit and head, set from the outfit room), `Verbose` (extra log lines in
 `coremod\logs`).
 
 ## Known issues

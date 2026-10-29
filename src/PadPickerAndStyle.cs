@@ -42,8 +42,9 @@ namespace LocalCoop
             if (heldSince < 0) { heldSince = Clock.Now; return; }
             if (heldSince == double.MaxValue || Clock.Now - heldSince < 1.0) return;
             heldSince = double.MaxValue;   // once per hold
-            if (isP1) { Announce(); CoopInput.Rumble(_input.P1Pad, 0.6, 0.3); Logger.Information("[LocalCoop] That controller is already player 1"); }
-            else DoSwapPads("Back+Start");
+            // Back+Start on either controller opens the "Choose your side" screen (v0.9.0; before: instant swap).
+            if (_input.AllConnectedPads().Count >= 2) OpenSidesScreen(thenControls: false);
+            else { Announce(); CoopInput.Rumble(_input.P1Pad, 0.6, 0.3); }
         }
 
         private void DoSwapPads(string how)
