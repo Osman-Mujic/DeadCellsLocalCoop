@@ -65,19 +65,27 @@ namespace LocalCoop
 
         // ------------------------------------------------------------------ Watcher charge
 
-        private dc.String? _watcherKeyP1, _watcherKeyP2;
+        private string? _watcherKeyBase;
 
+        /// <summary>
+        /// Run a Watcher method with the charge key of the deck's owner. Nested calls happen (the hit handler calls
+        /// getCharge), so the key is put back to whatever it was before this call. v0.8.0-0.9.0 put back P1's key
+        /// unconditionally: after P2's hit handler called getCharge, the rest of it ran with P1's key, so P2's hit
+        /// emptied P1's card and P2's own charge never dropped (P2 never took damage; playtest 10, bug 2).
+        /// </summary>
         private void WithWatcherKey(DiverseDeckWatcher self, Action act)
         {
             Hero? owner = null;
             try { owner = self.owner as Hero; } catch { }
-            if (!IsP2(owner)) { act(); return; }
             var cls = DiverseDeckWatcher.Class;
-            _watcherKeyP1 ??= cls.gameDataChargekeyName;
-            _watcherKeyP2 ??= (_watcherKeyP1?.ToString() + "_coopP2").AsHaxeString();
-            cls.gameDataChargekeyName = _watcherKeyP2;
+            var prev = cls.gameDataChargekeyName;
+            _watcherKeyBase ??= prev?.ToString();
+            if (_watcherKeyBase == null) { act(); return; }
+            string want = IsP2(owner) ? _watcherKeyBase + "_coopP2" : _watcherKeyBase;
+            if (prev?.ToString() == want) { act(); return; }
+            cls.gameDataChargekeyName = want.AsHaxeString();
             try { act(); }
-            finally { cls.gameDataChargekeyName = _watcherKeyP1; }
+            finally { cls.gameDataChargekeyName = prev; }
         }
     }
 }

@@ -15,7 +15,7 @@ namespace LocalCoop
     /// </summary>
     public partial class LocalCoopMod
     {
-        private readonly ConditionalWeakTable<dc.ui.Process, object> _p2Uis = new();
+        private readonly PinnedTable<dc.ui.Process, object> _p2Uis = new();
         private int _p2TurnDepth;
         private int _p2UiDepth;
         private int _replaceUiDepth;

@@ -24,7 +24,7 @@ namespace LocalCoop
         {
             public dc.pr.Level? Level;
             public ArmoryButton? P1Choice, P2Choice;
-            public readonly ConditionalWeakTable<ArmoryButton, List<PipeItem>> Released = new();
+            public readonly PinnedTable<ArmoryButton, List<PipeItem>> Released = new();
         }
         private readonly ArmoryState _armory = new();
 

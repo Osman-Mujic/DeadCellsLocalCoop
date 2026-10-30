@@ -4,9 +4,9 @@ Two players, one PC, two controllers: a second Beheaded joins your run in **Dead
 health, flasks, weapons, skills, mutations, scrolls and HUD. Built as a code mod for
 [Dead Cells Core Modding (DCCM)](https://github.com/dead-cells-core-modding/core).
 
-> **Status: beta.** Played from the start of a run through the Bank (Prisoners' Quarters, Promenade,
-> Prison Depths, Ossuary, Black Bridge) by two players on version 0.6.0. Versions 0.7.x and 0.8.0 fix the bugs
-> found in that run but have not been played yet. Expect rough edges and please report them.
+> **Status: beta.** Played by two players from the start of a run to the Lighthouse on version 0.9.0.
+> Version 0.10.0 fixes the bugs found in that run but has not been played yet. Expect rough edges and please
+> report them.
 
 ## What you get
 
@@ -16,8 +16,8 @@ health, flasks, weapons, skills, mutations, scrolls and HUD. Built as a code mod
 - **Loot for two**: when one player takes a weapon, skill, amulet, mutation or food, a copy appears that only the
   other player can take. Scrolls of power are offered to both. Each player chooses their own starting weapons,
   their own item in reward rooms, and can use each fountain once.
-- **Down, not out**: a player who "dies" goes down and is revived by standing next to them. The run ends only if
-  both are down.
+- **Down, not out**: a player who "dies" goes down and is revived by standing next to them. If the other player
+  moves on, the body is carried along. The run ends only if both are down.
 - **Menus for player 2**: item swap, scroll choice, mutations, the forge, the pause/inventory screen and the
   outfit room all work with player 2's controller and change player 2's things.
 - **Team keys**: a key or keycard carried by either player opens doors for both.
@@ -66,6 +66,8 @@ choose sides the first time.
 ## Known issues
 
 - Player 2 has no visible head.
+- In co-op both life bars keep one fixed width, so the HUDs never move; the numbers show the real life.
+- If a controller switches off, player 1 keeps theirs; when both are connected again the side screen opens.
 - Now and then player 2 floats after a double jump until they slam down. No trigger found yet.
 - Some skills or items that read "the hero" may act on player 1 when player 2 uses them. Diverse Deck and the
   Adele scythe are fixed; report others.

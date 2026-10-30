@@ -69,13 +69,35 @@ namespace LocalCoop
 
         private void InitStyleHooks()
         {
-            Hook_Skinner.onActivate += (orig, self, by, lp) => { _styleMenuForP2 = CoopActive && IsP2(by); RunAsPicker(by, () => orig(self, by, lp)); };
-            Hook_TailorDaughter.onActivate += (orig, self, by, lp) => { _styleMenuForP2 = CoopActive && IsP2(by); RunAsPicker(by, () => orig(self, by, lp)); };
+            Hook_Skinner.onActivate += (orig, self, by, lp) =>
+            {
+                _styleMenuForP2 = CoopActive && IsP2(by);
+                if (_styleMenuForP2) _p2StyleCineUntil = Clock.Now + 4;
+                RunAsPicker(by, () => orig(self, by, lp));
+            };
+            Hook_TailorDaughter.onActivate += (orig, self, by, lp) =>
+            {
+                _styleMenuForP2 = CoopActive && IsP2(by);
+                if (_styleMenuForP2) _p2StyleCineUntil = Clock.Now + 4;
+                RunAsPicker(by, () => orig(self, by, lp));
+            };
+            // The wardrobe's walk into and out of the changing booth is a cinematic run later with game.hero (P1).
+            Hook_GameCinematic.heroWalkUntil += (orig, self, h, px, dir, limit, onEnd) =>
+            {
+                if (Clock.Now < _p2StyleCineUntil && P2 != null && !P2.destroyed && h != null && ReferenceEquals(h, P1)) h = P2;
+                orig(self, h, px, dir, limit, onEnd);
+            };
             Hook__SkinSelector.__constructor__ += (orig, self, group, skinner) => OpenStyleMenu(self, () => orig(self, group, skinner));
             Hook__HeadSelector.__constructor__ += (orig, self) => OpenStyleMenu(self, () => orig(self));
             Hook_GridSelector.update += (orig, self) => AsOwner(self, () => orig(self));
             Hook_GridSelector.postUpdate += (orig, self) => AsOwner(self, () => orig(self));
-            Hook_GridSelector.onDispose += (orig, self) => AsOwner(self, () => orig(self));
+            Hook_GridSelector.onDispose += (orig, self) =>
+            {
+                AsOwner(self, () => orig(self));
+                // Safety net: if P2's style menu went away without its close() (where the choice is saved and P1's
+                // profile look put back), do that now, so P1's look is never left as P2's.
+                if (_p2StyleMenu != IntPtr.Zero && CoopInput.Ptr(self) == _p2StyleMenu) FinishP2StyleMenu();
+            };
             Hook_SkinSelector.close += (orig, self) => CloseStyleMenu(self, () => orig(self));
             Hook_HeadSelector.close += (orig, self) => CloseStyleMenu(self, () => orig(self));
 
@@ -87,6 +109,28 @@ namespace LocalCoop
 
         private bool _styleMenuForP2;
         private string? _p1SkinSaved, _p1HeadSaved;
+        private IntPtr _p2StyleMenu;          // P2's open outfit/head menu (game object address)
+        private double _p2StyleCineUntil;
+
+        /// <summary>
+        /// P2 keeps their own outfit and head from the start. With nothing saved for P2 yet, P2 was drawn from the
+        /// profile, i.e. as P1: P1 changing outfit changed P2's too at the next level (playtest 10, bug 1).
+        /// </summary>
+        private void SnapshotP2Style()
+        {
+            try
+            {
+                var user = Game.Class.ME?.user;
+                if (user == null || _p1SkinSaved != null) return;
+                bool changed = false;
+                if (string.IsNullOrEmpty(Config.P2Skin)) { Config.P2Skin = user.heroSkin?.ToString() ?? ""; changed = Config.P2Skin.Length > 0; }
+                if (string.IsNullOrEmpty(Config.P2Head)) { Config.P2Head = user.heroHeadSkin?.ToString() ?? ""; changed |= Config.P2Head.Length > 0; }
+                if (!changed) return;
+                try { _config?.Save(); } catch { }
+                Logger.Information("[LocalCoop] P2 starts with its own look: outfit={Skin} head={Head}", Config.P2Skin, Config.P2Head);
+            }
+            catch (Exception ex) { Logger.Warning(ex, "[LocalCoop] Saving P2's starting look failed"); }
+        }
 
         private void OpenStyleMenu(GridSelector ui, Action ctor)
         {
@@ -103,6 +147,7 @@ namespace LocalCoop
                 if (!string.IsNullOrEmpty(Config.P2Head)) user.heroHeadSkin = Config.P2Head.AsHaxeString();
             }
             WithHero(P2!, ctor);
+            _p2StyleMenu = CoopInput.Ptr(ui);
             try
             {
                 ui.controller = HandOver(ui.controller);
@@ -114,8 +159,20 @@ namespace LocalCoop
 
         private void CloseStyleMenu(GridSelector ui, Action close)
         {
-            if (!_p2Uis.TryGetValue(ui, out _)) { close(); return; }
-            AsOwner(ui, close);   // the game applies the choice to game.hero (= P2 here) and writes it to the profile
+            bool forP2 = _p2Uis.TryGetValue(ui, out _) || (_p2StyleMenu != IntPtr.Zero && CoopInput.Ptr(ui) == _p2StyleMenu);
+            if (!forP2 || P2 == null || P2.destroyed) { close(); return; }
+            _p2UiDepth++;
+            try { WithHero(P2, close); }   // the game applies the choice to game.hero (= P2 here) and writes it to the profile
+            finally { _p2UiDepth--; }
+            _p2StyleCineUntil = Clock.Now + 4;   // the walk out of the booth
+            FinishP2StyleMenu();
+        }
+
+        /// <summary>Save P2's choice (left in the profile by the menu) and put P1's own look back. Idempotent.</summary>
+        private void FinishP2StyleMenu()
+        {
+            _p2StyleMenu = IntPtr.Zero;
+            if (_p1SkinSaved == null && _p1HeadSaved == null) return;
             var user = Game.Class.ME?.user;
             if (user != null)
             {

@@ -126,6 +126,7 @@ namespace LocalCoop
                 _p2Down.Reset();
                 MarkInventoryOwned(p1);
                 MarkInventoryOwned(p2);
+                SnapshotP2Style();
                 CreateHud2();
                 // First co-op run: let the players pick their sides, then show the co-op controls.
                 if (!Config.SidesChosen && _input.AllConnectedPads().Count >= 2) _openSidesNextFrame = true;
@@ -222,6 +223,7 @@ namespace LocalCoop
                 if (_p1Down.Active) Revive(hero, _p1Down, "level change");
                 MarkInventoryOwned(hero);
                 MarkInventoryOwned(p2);
+                ClearCopyDrops();
                 RefreshHud2();
                 if (Config.Verbose) Logger.Information("[LocalCoop] P2 followed into {Level} at {Cx},{Cy}", lvl.map?.id?.ToString(), cx, cy);
             }
@@ -270,6 +272,7 @@ namespace LocalCoop
                 HandleToggleKey();
                 if (_input.EnsureCreated()) _input.Refresh();
                 UpdateScreens();
+                UpdatePadLoss();
                 if (!ScreenOpen) UpdatePadPicker();
 
                 var p1 = P1;
@@ -290,6 +293,7 @@ namespace LocalCoop
                 if (_p1SkinSaved == null) KeepCameraOnPlayers();
                 UpdateDowned(p1, P2, dt);
                 UpdateTeleportFollow(p1, P2);
+                UpdateBossRegroup();
                 UpdateLeash(p1, P2, dt);
                 if (!ScreenOpen)
                 {

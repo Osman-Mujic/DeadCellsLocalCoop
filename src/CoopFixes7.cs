@@ -56,7 +56,7 @@ namespace LocalCoop
         // ------------------------------------------------------------------ fountains
 
         private sealed class FountainUse { public bool P1, P2; }
-        private readonly ConditionalWeakTable<Fountain, FountainUse> _fountainUse = new();
+        private readonly PinnedTable<Fountain, FountainUse> _fountainUse = new();
 
         private bool UsedFountain(Fountain f, Hero by)
         {
@@ -178,11 +178,13 @@ namespace LocalCoop
             var hud1 = Game.Class.ME?.hud;
             if (Hud2Ok)
             {
+                KeepLifeBarFixed(_hud2);
                 ApplyHudLayout(_hud2!);
                 SyncTiers(p2, _hud2!);
             }
             if (hud1 != null && !hud1.destroyed)
             {
+                KeepLifeBarFixed(hud1);
                 ApplyHudLayout(hud1);
                 if (!ReferenceEquals(hud1, _hud2)) SyncTiers(p1, hud1);
             }

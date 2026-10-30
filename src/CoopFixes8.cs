@@ -118,7 +118,7 @@ namespace LocalCoop
         // ------------------------------------------------------------------ kills
 
         private sealed class KillMark { public IntPtr Hero; }
-        private readonly ConditionalWeakTable<Mob, KillMark> _killCounted = new();
+        private readonly PinnedTable<Mob, KillMark> _killCounted = new();
 
         private void Hook_Hero_addKillCount(Hook_Hero.orig_addKillCount orig, Hero self, Mob m)
         {
@@ -144,7 +144,7 @@ namespace LocalCoop
             {
                 var item = self.item;
                 if (Config.LootParity && CoopActive && by != null && item != null && IsParityItem(item)
-                    && !_reserved.TryGetValue(self, out _) && !_noParity.TryGetValue(self, out _)
+                    && !_reserved.TryGetValue(self, out _) && !IsCopyDrop(self) && !_noParity.TryGetValue(self, out _)
                     && !_ownedItems.TryGetValue(item, out _) && !IsOwnedId(SafeId(item)))
                 {
                     partner = Partner(by);
@@ -170,6 +170,7 @@ namespace LocalCoop
                 drop.setPosCase(cx, cy, xr, yr);
                 Reserve(drop, partner);
                 _noParity.AddOrUpdate(drop, this);
+                MarkCopyDrop(drop);
                 _parityCopies++;
                 Logger.Information("[LocalCoop] Loot parity ({Why}): {Item} left for {Partner} (#{N})", why, ItemId(copy), IsP2(partner) ? "P2" : "P1", _parityCopies);
                 return drop;
@@ -191,9 +192,9 @@ namespace LocalCoop
             public bool Done;
         }
 
-        private readonly ConditionalWeakTable<ItemAltar, AltarGroup> _altarGroups = new();
+        private readonly PinnedTable<ItemAltar, AltarGroup> _altarGroups = new();
         private readonly List<AltarGroup> _openAltarGroups = new();
-        private readonly ConditionalWeakTable<ItemAltar, ItemDrop> _altarCopies = new();
+        private readonly PinnedTable<ItemAltar, ItemDrop> _altarCopies = new();
         private AltarGroup? _collectingGroup;
         private Hero? _lastAltarPicker;
 
@@ -272,20 +273,37 @@ namespace LocalCoop
         }
 
         // ------------------------------------------------------------------ life bars
-        // The life bar widens with max life (HUD.updateLifeSize f@5325, 217..350 px at 1x); two wide bars overlapped
-        // in the middle of the screen. In co-op a bar that would cross the middle stays at its smallest width.
+        // The life bar widens with max life (HUD.updateLifeSize f@5325, 217..350 px at 1x, from 14 call sites, and it
+        // reads game.hero's items even for P2's HUD); two wide bars overlapped in the middle of the screen, and P2's
+        // right-aligned HUD slid left as its bar grew (playtests 8 and 10). In co-op both bars keep one fixed width
+        // (the game's own smallest, ratio 1.0): the HUDs never move. The numbers still show the real life.
+
+        private readonly Dictionary<IntPtr, int> _fixedLifeWid = new();
 
         private void UpdateLifeSizeCoop(Hook_HUD.orig_updateLifeSize o, HUD h, double? m)
         {
-            o(h, m);
-            if (!Hud2Ok || h.leftFlow == null) return;
+            if (!Hud2Ok) { o(h, m); return; }
+            o(h, 1.0);
             try
             {
-                int w = dc.hxd.Window.Class.getInstance.Invoke().get_width();
-                double hm = System.Math.Ceiling(w * 0.025);
-                if (h.leftFlow.get_outerWidth() + hm > w / 2.0 - hm / 2) o(h, 1.0);
+                var st = h.heroLifeBar?.curState;
+                if (st != null) _fixedLifeWid[CoopInput.Ptr(h)] = st.outerWid;
             }
             catch { }
+        }
+
+        /// <summary>Per frame: if anything resized a life bar behind our back, put it back to the fixed width.</summary>
+        private void KeepLifeBarFixed(HUD? h)
+        {
+            if (h == null || h.destroyed || !Hud2Ok) return;
+            try
+            {
+                var st = h.heroLifeBar?.curState;
+                if (st == null) return;
+                if (_fixedLifeWid.TryGetValue(CoopInput.Ptr(h), out int want) && st.outerWid == want) return;
+                AsHudOwner(h, () => h.updateLifeSize(1.0));
+            }
+            catch (Exception ex) { if (_hud2Errors.Add("lifewid:" + ex.Message)) Logger.Warning(ex, "[LocalCoop] Life bar width fix failed"); }
         }
     }
 }

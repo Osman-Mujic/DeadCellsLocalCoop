@@ -20,9 +20,9 @@ namespace LocalCoop
     public partial class LocalCoopMod
     {
         private sealed class Reservation { public Hero? For; }
-        private readonly ConditionalWeakTable<ItemDrop, Reservation> _reserved = new();
-        private readonly ConditionalWeakTable<Entity, object> _noParity = new();
-        private readonly ConditionalWeakTable<InventItem, object> _ownedItems = new();
+        private readonly PinnedTable<ItemDrop, Reservation> _reserved = new();
+        private readonly PinnedTable<Entity, object> _noParity = new();
+        private readonly PinnedTable<InventItem, object> _ownedItems = new();
         private readonly HashSet<int> _ownedIds = new();
         private int _dropDepth;
         private int _shopDepth;
@@ -156,7 +156,7 @@ namespace LocalCoop
                     partner = Partner(self);
                     if (partner == null || partner.destroyed) why = "no partner";
                     else if (!IsParityItem(item)) why = "not per-player";
-                    else if (from is ItemDrop d && _reserved.TryGetValue(d, out _)) why = "reserved/copy";
+                    else if (from is ItemDrop d && (_reserved.TryGetValue(d, out _) || IsCopyDrop(d))) why = "reserved/copy";
                     else if (from is ShopBooth || _shopDepth > 0) why = "bought in a shop";
                     else if (_noParity.TryGetValue(from, out _)) why = "shop/pipe/dropped";
                     else if (_ownedItems.TryGetValue(item, out _) || IsOwnedId(SafeId(item))) why = "already owned";

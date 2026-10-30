@@ -35,7 +35,7 @@ namespace LocalCoop
             InitHudRouting();
             InitCoopFixes7();
             InitCoopFixes8();
-            InitCoopFixes9();
+            InitCoopFixes9(); InitCoopFixes10();
             InitKeyRing();
             InitStyleHooks();
         }

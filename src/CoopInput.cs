@@ -56,6 +56,7 @@ namespace LocalCoop
                     pads.Add(gp);
             }
             pads.Sort((a, b) => a.device.index.CompareTo(b.device.index));
+            ConnectedCount = pads.Count;
             int sig = pads.Count == 0 ? 0 : pads.Aggregate(17, (h, p) => h * 31 + p.device.index + 1);
             if (!force && sig == _lastPadSignature) return;
             _lastPadSignature = sig;
@@ -68,6 +69,15 @@ namespace LocalCoop
                 P1Pad = swap ? pads[1] : pads[0];
                 P2Pad = swap ? pads[0] : pads[1];
                 P1Controller.gc = P1Pad;     // P1: keyboard + pad 1
+            }
+            else if (pads.Count >= 1 && P1Pad?.device != null && P2Pad != null && pads[0].device.index == P1Pad.device.index)
+            {
+                // Player 2's controller dropped out mid-game (battery): player 1 keeps their own controller, player 2
+                // waits. (Before: the remaining pad went to P2, so the players had swapped controllers; playtest 10.)
+                P1Pad = pads[0];
+                P2Pad = null;
+                P1Controller.gc = P1Pad;
+                P1Controller.mode = Controller.Class.ENABLE_PAD | Controller.Class.ENABLE_KEY;
             }
             else if (pads.Count >= 1)
             {
@@ -104,6 +114,9 @@ namespace LocalCoop
         }
 
         public bool HasP2Input => P2Pad != null;
+
+        /// <summary>Controllers connected at the last refresh.</summary>
+        public int ConnectedCount { get; private set; }
 
         /// <summary>Connected pads in device order (the same order Refresh uses before SwapPads).</summary>
         public List<GamePad> AllConnectedPads()
