@@ -35,7 +35,7 @@ namespace LocalCoop
             InitHudRouting();
             InitCoopFixes7();
             InitCoopFixes8();
-            InitCoopFixes9(); InitCoopFixes10(); InitPlayerOneOnlyFixes();
+            InitCoopFixes9(); InitCoopFixes10(); InitPlayerOneOnlyFixes(); InitCurseAndMalaise();
             InitKeyRing();
             InitStyleHooks();
         }
