@@ -386,8 +386,25 @@ namespace LocalCoop
             if (System.Math.Abs(x1 - x2) < maxSpan) return;
             Hero left = x1 < x2 ? p1 : p2, right = x1 < x2 ? p2 : p1;
             double lx = PosX(left), rx = PosX(right);
-            HoldAtEdge(left, -1, rx - maxSpan);
-            HoldAtEdge(right, +1, lx + maxSpan);
+            if (!MovedByGame(left)) HoldAtEdge(left, -1, rx - maxSpan);
+            if (!MovedByGame(right)) HoldAtEdge(right, +1, lx + maxSpan);
+        }
+
+        /// <summary>
+        /// The game is moving this hero itself: a cinematic is running or the hero's controls are locked (teleporter
+        /// slide, walk into a booth or arena, knock-back). The screen edge must not fight that: a teleporter next to
+        /// P1 at the edge held P1 jittering in place for the 2.5 s the teleport takes (playtest 10 follow-up), and a
+        /// scripted walk (GameCinematic.heroWalkUntil, 2 s limit) would end short of where the scene expects.
+        /// </summary>
+        private static bool MovedByGame(Hero h)
+        {
+            try
+            {
+                var game = Game.Class.ME;
+                if (game != null && game.hasCinematic()) return true;
+                return h.controlsLocked(default);
+            }
+            catch { return false; }
         }
 
         /// <summary>
