@@ -58,7 +58,7 @@ namespace LocalCoop
             // area of game.hero's room (AmazonBase.insideRoom f@7011). That check gates her activation and her damage
             // (AmazonBase.applyAttackResult): with P1 in another room, Calliope froze and took no damage while P2
             // fought her. Now either living player's room counts; each sister fights the nearer player; the manager
-            // that runs the climb follows the player who is ahead.
+            // that runs the climb follows the player the sisters should chase (Playtest12.cs, playtest 12).
             Hook_AmazonBase.insideRoom += (o, s) => o(s) || AsP2Check(s, () => o(s));
             Hook_AmazonBase.fixedUpdate += (o, s) => AsNearestHero(s, () => o(s));
             Hook_AmazonBrutal.fixedUpdate += (o, s) => AsNearestHero(s, () => o(s));
@@ -113,26 +113,7 @@ namespace LocalCoop
             return r;
         }
 
-        /// <summary>The player the Lighthouse climb follows: the living one who is higher up (the climb goes up).</summary>
-        private Hero? ClimbLeader(Entity e)
-        {
-            var p1 = P1; var p2 = P2;
-            bool p1Ok = p1 != null && !p1.destroyed && !_p1Down.Active && p1.life > 0 && ReferenceEquals(p1._level, e._level);
-            bool p2Ok = P2CanAct(e);
-            if (p1Ok && !p2Ok) return p1;
-            if (!p1Ok && p2Ok) return p2;
-            if (!p1Ok) return null;
-            return (p2!.cy + p2.yr) < (p1!.cy + p1.yr) - 2 ? p2 : p1;   // P2 clearly higher: P2 leads
-        }
-
-        private void Hook_AmazonManager_fixedUpdate(Hook_AmazonManager.orig_fixedUpdate orig, AmazonManager self)
-        {
-            if (!CoopActive) { orig(self); return; }
-            var lead = ClimbLeader(self);
-            try { if (lead != null && !ReferenceEquals(self.hero, lead)) self.hero = lead; } catch { }
-            if (lead != null && IsP2(lead)) WithHero(lead, () => orig(self));
-            else orig(self);
-        }
+        // The manager that runs the climb (Hook_AmazonManager_fixedUpdate) is in Playtest12.cs.
 
         // ------------------------------------------------------------------ saved player 2 (bug 6)
         // Heroes are saved as ordinary level entities (Level.registerEntity -> savedEntities; Entity.shouldSave is

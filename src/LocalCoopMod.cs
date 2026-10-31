@@ -297,6 +297,7 @@ namespace LocalCoop
                 UpdateDowned(p1, P2, dt);
                 UpdateTeleportFollow(p1, P2);
                 UpdateBossRegroup();
+                UpdateMutationShare(p1, P2);
                 UpdateLeash(p1, P2, dt);
                 if (!ScreenOpen)
                 {

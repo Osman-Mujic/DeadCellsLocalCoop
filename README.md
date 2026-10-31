@@ -68,6 +68,10 @@ choose sides the first time.
 - Player 2's head: fixed in 0.11.0 (it was drawn on player 1), not confirmed in play yet.
 - Save and continue: player 2 is saved with the run and restored on Continue (0.11.0). A run saved with 0.10.x or
   earlier may contain extra copies of the heroes; the mod keeps one as player 2 and removes the rest.
+- Lighthouse sisters: a sister could stay invulnerable for a whole fight when one player stood in a spot where
+  the sisters stop chasing. Fixed in 0.11.1, not confirmed in play yet.
+- Frostbite and Superconductor work for whichever player has them: an enemy that is frozen (or shocked) takes the
+  damage if either player has the mutation, whoever froze it. The game does not record who froze an enemy.
 - In co-op both life bars keep one fixed width, so the HUDs never move; the numbers show the real life.
 - If a controller switches off, player 1 keeps theirs; when both are connected again the side screen opens.
 - Now and then player 2 floats after a double jump until they slam down. No trigger found yet.
