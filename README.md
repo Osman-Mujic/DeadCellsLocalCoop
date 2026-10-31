@@ -13,8 +13,8 @@ health, flasks, weapons, skills, mutations, scrolls and HUD. Built as a code mod
 - **Second player** on a second controller (or keyboard + one controller: player 1 on keyboard).
 - **Shared camera** that follows both players and keeps them on one screen.
 - **Player 2 HUD** in the bottom-right corner; player 1's minimap moves to the top-left.
-- **Loot for two**: when one player takes a weapon, skill, amulet, mutation or food, a copy appears that only the
-  other player can take. Scrolls of power are offered to both. Each player chooses their own starting weapons,
+- **Loot for two**: when one player takes (or buys) a weapon, skill, amulet, mutation or food, a copy appears that
+  only the other player can take. Scrolls of power are offered to both. Each player chooses their own starting weapons,
   their own item in reward rooms, and can use each fountain once.
 - **Down, not out**: a player who "dies" goes down and is revived by standing next to them. If the other player
   moves on, the body is carried along. The run ends only if both are down.
@@ -65,7 +65,9 @@ choose sides the first time.
 
 ## Known issues
 
-- Player 2 has no visible head.
+- Player 2's head: fixed in 0.11.0 (it was drawn on player 1), not confirmed in play yet.
+- Save and continue: player 2 is saved with the run and restored on Continue (0.11.0). A run saved with 0.10.x or
+  earlier may contain extra copies of the heroes; the mod keeps one as player 2 and removes the rest.
 - In co-op both life bars keep one fixed width, so the HUDs never move; the numbers show the real life.
 - If a controller switches off, player 1 keeps theirs; when both are connected again the side screen opens.
 - Now and then player 2 floats after a double jump until they slam down. No trigger found yet.

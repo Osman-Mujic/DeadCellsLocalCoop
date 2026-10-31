@@ -280,6 +280,9 @@ namespace LocalCoop
                     return;
 
                 if (P2 != null && P2.destroyed) { Logger.Warning("[LocalCoop] P2 was destroyed by the game"); P2 = null; }
+                // A P2 saved with the level (quit to title, then Continue) is taken back first (playtest 11, bug 6).
+                if (P2 == null && Config.AutoSpawnP2 && !_spawningP2 && IsRunLevel(p1._level) && TryAdoptSavedP2(p1))
+                    _openSidesNextFrame = false;
                 if (P2 == null && Config.AutoSpawnP2 && _input.HasP2Input && !_spawningP2 && IsRunLevel(p1._level))
                     SpawnP2();
                 if (P2 == null) return;

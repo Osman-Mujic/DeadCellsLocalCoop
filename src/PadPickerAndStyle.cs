@@ -209,12 +209,20 @@ namespace LocalCoop
             bool p2Head = false;
             try { p2Head = P2 != null && CoopInput.Ptr(P2.heroHead) == CoopInput.Ptr(self); } catch { }
             if (!p2Head) { orig(self, level, parent, fromUI); return; }
-            var user = Game.Class.ME?.user;
-            if (user == null || string.IsNullOrEmpty(Config.P2Head) || _p1SkinSaved != null) { orig(self, level, parent, fromUI); return; }
-            var head = user.heroHeadSkin;
-            user.heroHeadSkin = HxCached(Config.P2Head, ref _p2HeadHx);
-            try { orig(self, level, parent, fromUI); }
-            finally { user.heroHeadSkin = head; }
+            // HeroHead.init (f@2194) sets head.hero = game.hero: P2's head was created outside P2's turn and followed P1.
+            // That is why P2 never showed a head, why P2's new head style appeared on P1 (playtest 11, bug 2) and why
+            // P2's head throw used P1's head (bug 1). The head now always belongs to P2.
+            var scope = EnterP2Scope();
+            try
+            {
+                var user = Game.Class.ME?.user;
+                if (user == null || string.IsNullOrEmpty(Config.P2Head) || _p1SkinSaved != null) { orig(self, level, parent, fromUI); return; }
+                var head = user.heroHeadSkin;
+                user.heroHeadSkin = HxCached(Config.P2Head, ref _p2HeadHx);
+                try { orig(self, level, parent, fromUI); }
+                finally { user.heroHeadSkin = head; }
+            }
+            finally { ExitP2Scope(scope); }
         }
 
         /// <summary>Menus that focus the camera on "the hero" can leave it following P2 alone; put it back on P1 (shared camera).</summary>

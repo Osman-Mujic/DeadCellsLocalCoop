@@ -14,7 +14,8 @@ namespace LocalCoop
     /// 2. World loot (weapons, skills, amulets, mutations, scrolls, food found behind doors, in chests,
     ///    dropped by elites...): when one player takes it, a copy appears on the spot that only the
     ///    partner can take.
-    /// Never copied: shop purchases, items a player drops or swaps out of their inventory, copies,
+    /// Shop purchases leave the partner a copy too (since v0.11.0), once paid for.
+    /// Never copied: items a player drops or swaps out of their inventory, copies,
     /// keys/runes/boss cells/blueprints/outfits, money pickups.
     /// </summary>
     public partial class LocalCoopMod
@@ -157,7 +158,9 @@ namespace LocalCoop
                     if (partner == null || partner.destroyed) why = "no partner";
                     else if (!IsParityItem(item)) why = "not per-player";
                     else if (from is ItemDrop d && (_reserved.TryGetValue(d, out _) || IsCopyDrop(d))) why = "reserved/copy";
-                    else if (from is ShopBooth || _shopDepth > 0) why = "bought in a shop";
+                    // A purchase at a shop booth leaves the partner a copy once it is paid for (owner request,
+                    // playtest 11); other items moving during a purchase (the buyer's swapped-out item) never do.
+                    else if (_shopDepth > 0 && from is not ShopBooth) why = "dropped during a purchase";
                     else if (_noParity.TryGetValue(from, out _)) why = "shop/pipe/dropped";
                     else if (_ownedItems.TryGetValue(item, out _) || IsOwnedId(SafeId(item))) why = "already owned";
                     else
@@ -222,7 +225,8 @@ namespace LocalCoop
                     Logger.Information("[LocalCoop] {Who} took {Item} (no copy: {Why})", IsP2(p.Picker) ? "P2" : "P1", ItemId(p.Item), p.Why);
                 return;
             }
-            var drop = SpawnPartnerCopy(p.Lvl, p.Cx, p.Cy, p.Xr, p.Yr, p.Copy, p.Partner, (IsP2(p.Picker) ? "P2" : "P1") + " took it");
+            var drop = SpawnPartnerCopy(p.Lvl, p.Cx, p.Cy, p.Xr, p.Yr, p.Copy, p.Partner,
+                (IsP2(p.Picker) ? "P2" : "P1") + (p.From is ShopBooth ? " bought it" : " took it"));
             if (drop != null && p.From is ItemAltar altar) _altarCopies.AddOrUpdate(altar, drop);
         }
 
