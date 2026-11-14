@@ -232,6 +232,7 @@ namespace LocalCoop
             _l3Was1 = d1; _l3Was2 = d2;
             if (!press1 && !press2) return;
             if (!ReferenceEquals(p1._level, p2._level) || _p2Down.Active || _p1Down.Active || p1.life <= 0 || p2.life <= 0) return;
+            if (RegroupBlocked(p1, p2)) return;
             if (press1) { MoveTo(p2, p1); Logger.Information("[LocalCoop] Regroup (P1 L3): P2 brought to P1"); }
             else { MoveTo(p1, p2); Logger.Information("[LocalCoop] Regroup (P2 L3): P1 brought to P2"); }
         }

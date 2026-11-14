@@ -198,6 +198,7 @@ namespace LocalCoop
         {
             var hero = orig(self, lvl, cx, cy, from, fromDeadBody, oldLevel);
             var p2 = P2;
+            try { OnArrivedInLevel(lvl, hero, p2); } catch (Exception ex) { Logger.Warning(ex, "[LocalCoop] Arrival cleanup failed"); }
             if (p2 == null || p2.destroyed || ReferenceEquals(p2, hero)) return hero;
             try
             {
@@ -304,6 +305,7 @@ namespace LocalCoop
                 UpdateFlaskDisplay(p1, P2);
                 UpdateFountainLooks();
                 ShowConfigNotice(p1);
+                UpdateArrivalTrace(p1, P2);
                 UpdateLeash(p1, P2, dt);
                 if (!ScreenOpen)
                 {
@@ -344,6 +346,8 @@ namespace LocalCoop
         private void UpdateLeash(Hero p1, Hero p2, double dt)
         {
             if (_p1Down.Active || _p2Down.Active || !ReferenceEquals(p1._level, p2._level)) { _leashTimer = 0; return; }
+            // Playtest 14: never pull P2 up to a P1 the game is holding (cinematic, fatal fall); P2 fell back each time.
+            if (HandsOff(p1, p2)) { _leashTimer = 0; return; }
 
             // Screen-bound camera: both players must stay inside one screen. The camera sits at the
             // midpoint, so we cap how far apart they can be horizontally; whoever walks into the

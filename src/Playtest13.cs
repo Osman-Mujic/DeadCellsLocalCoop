@@ -29,7 +29,7 @@ namespace LocalCoop
     /// </summary>
     public partial class LocalCoopMod
     {
-        private static readonly string[] WarpTargets = { "T_Lighthouse", "Lighthouse" };
+        private static readonly string[] WarpTargets = { "T_Lighthouse", "Lighthouse", "T_Queen", "QueenArena" };
 
         private readonly Dictionary<IntPtr, (int Left, int Max)> _flaskShown = new();
         private readonly double[] _flaskWrongSince = { -1, -1 };
@@ -177,7 +177,7 @@ namespace LocalCoop
                     var from = self.mainId?.ToString();
                     if (target == null)
                     {
-                        Logger.Warning("[LocalCoop] TestWarpTo \"{Want}\" is not supported (use T_Lighthouse or Lighthouse); ignored", want);
+                        Logger.Warning("[LocalCoop] TestWarpTo \"{Want}\" is not supported (use T_Lighthouse, Lighthouse, T_Queen or QueenArena); ignored", want);
                     }
                     // Only a real exit from a level being played: not the start of a run, not Continue
                     // (Game.transitionToLevel -> LevelTransition.goto(data.mainLevel), no level loaded yet).

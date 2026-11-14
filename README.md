@@ -63,8 +63,8 @@ choose sides the first time.
 `SwapPads`, `SidesChosen` (set to false to see the side screen again), `P2Skin`/`P2Head` (player 2's outfit and head, set from the outfit room), `Verbose` (extra log lines in
 `coremod\logs`).
 
-Testing the Lighthouse: set `"TestWarpTo": "T_Lighthouse"` (game closed), start or continue a run, and
-take the next level exit (the first one out of the Prisoners' Quarters works): it leads to the Lighthouse's entrance. It works once and
+Testing late fights: set `"TestWarpTo"` to `"T_Lighthouse"` or `"T_Queen"` (game closed), start or continue a run, and
+take the next level exit (the first one out of the Prisoners' Quarters works): it leads to that level instead. It works once and
 then clears itself. You arrive with whatever gear you have.
 If the settings file has a typo, the mod says so in the game, starts with default settings and keeps your file
 as `DeadCellsLocalCoop.json.broken.txt`.

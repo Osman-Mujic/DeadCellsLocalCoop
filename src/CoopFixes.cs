@@ -35,7 +35,7 @@ namespace LocalCoop
             InitHudRouting();
             InitCoopFixes7();
             InitCoopFixes8();
-            InitCoopFixes9(); InitCoopFixes10(); InitPlayerOneOnlyFixes(); InitCurseAndMalaise(); InitPlaytest11(); InitPlaytest12(); InitPlaytest13();
+            InitCoopFixes9(); InitCoopFixes10(); InitPlayerOneOnlyFixes(); InitCurseAndMalaise(); InitPlaytest11(); InitPlaytest12(); InitPlaytest13(); InitPlaytest14();
             InitKeyRing();
             InitStyleHooks();
         }
@@ -129,6 +129,8 @@ namespace LocalCoop
         {
             bool sameLevel = ReferenceEquals(p1._level, p2._level);
             bool j1 = Jumped(p1, _last1), j2 = Jumped(p2, _last2);
+            // Playtest 14: the game places heroes itself right after a level change and in cinematics and fatal falls.
+            if (Clock.Now - _arrivedAt < 2 || HandsOff(p1, p2)) return;
             if (sameLevel && !_p1Down.Active && !_p2Down.Active && j1 != j2)
             {
                 Hero mover = j1 ? p1 : p2, other = j1 ? p2 : p1;
