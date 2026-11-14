@@ -64,7 +64,7 @@ choose sides the first time.
 `coremod\logs`).
 
 Testing the Lighthouse: set `"TestWarpTo": "T_Lighthouse"` (game closed), start or continue a run, and
-take any level exit after the Prisoners' Quarters: it leads to the Lighthouse's entrance instead. It works once and
+take the next level exit (the first one out of the Prisoners' Quarters works): it leads to the Lighthouse's entrance. It works once and
 then clears itself. You arrive with whatever gear you have.
 
 ## Known issues
