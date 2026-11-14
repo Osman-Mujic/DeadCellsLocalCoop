@@ -44,6 +44,8 @@ namespace LocalCoop
         /// <summary>Player 2's own outfit and head (chosen in the outfit room / head room by P2). Empty = same as P1.</summary>
         public string P2Skin { get; set; } = "";
         public string P2Head { get; set; } = "";
+        /// <summary>Testing only: "T_Lighthouse" or "Lighthouse" sends the next level exit there (once; then cleared).</summary>
+        public string TestWarpTo { get; set; } = "";
         /// <summary>Write extra diagnostics to the DCCM log.</summary>
         public bool Verbose { get; set; } = true;
     }
@@ -298,6 +300,7 @@ namespace LocalCoop
                 UpdateTeleportFollow(p1, P2);
                 UpdateBossRegroup();
                 UpdateMutationShare(p1, P2);
+                UpdateFlaskDisplay(p1, P2);
                 UpdateLeash(p1, P2, dt);
                 if (!ScreenOpen)
                 {

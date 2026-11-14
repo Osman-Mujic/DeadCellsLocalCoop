@@ -33,7 +33,7 @@ namespace LocalCoop
             };
 
             // Hero -> HUD reports made while P2 acts go to P2's HUD.
-            Hook_HUD.setHealings += (o, s, a, b) => Route(s, h => o(h, a, b));
+            Hook_HUD.setHealings += (o, s, a, b) => Route(s, h => { o(h, a, b); NoteFlaskShown(h, a, b); });
             Hook_HUD.updateAmmo += (o, s, i) => Route(s, h => o(h, i));
             Hook_HUD.updateIcon += (o, s, i, t) => Route(s, h => o(h, i, t));
             Hook_HUD.highlightItem += (o, s, i) => Route(s, h => o(h, i));

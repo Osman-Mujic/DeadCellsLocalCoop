@@ -63,6 +63,10 @@ choose sides the first time.
 `SwapPads`, `SidesChosen` (set to false to see the side screen again), `P2Skin`/`P2Head` (player 2's outfit and head, set from the outfit room), `Verbose` (extra log lines in
 `coremod\logs`).
 
+Testing the Lighthouse: set `"TestWarpTo": "T_Lighthouse"` (game closed), start or continue a run, and
+take any level exit after the Prisoners' Quarters: it leads to the Lighthouse's entrance instead. It works once and
+then clears itself. You arrive with whatever gear you have.
+
 ## Known issues
 
 - Player 2's head: fixed in 0.11.0 (it was drawn on player 1), not confirmed in play yet.
@@ -72,6 +76,7 @@ choose sides the first time.
   the sisters stop chasing. Fixed in 0.11.1, not confirmed in play yet.
 - Frostbite and Superconductor work for whichever player has them: an enemy that is frozen (or shocked) takes the
   damage if either player has the mutation, whoever froze it. The game does not record who froze an enemy.
+- If the flask icon ever looks wrong, the mod redraws it within two seconds (0.11.2) and notes it in the log.
 - In co-op both life bars keep one fixed width, so the HUDs never move; the numbers show the real life.
 - If a controller switches off, player 1 keeps theirs; when both are connected again the side screen opens.
 - Now and then player 2 floats after a double jump until they slam down. No trigger found yet.
