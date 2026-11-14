@@ -117,6 +117,53 @@ namespace LocalCoop
             catch (Exception ex) { if (_hud2Errors.Add("flask:" + ex.Message)) Logger.Warning(ex, "[LocalCoop] Flask icon check failed"); }
         }
 
+        // ------------------------------------------------------------------ settings file with a typo
+
+        // Playtest 13: a typo in DeadCellsLocalCoop.json ("After parsing a value an unexpected character", line 22)
+        // made DCCM drop the whole file and write the defaults back (Config`1.Load), so TestWarpTo and the other
+        // settings were silently lost. Now the file is checked first; a broken one is kept as .broken.txt and the
+        // players get a message in the game.
+        private string? _configProblem;
+        private bool _configNoticeShown;
+
+        private void CheckConfigFile()
+        {
+            try
+            {
+                var candidates = new List<string>();
+                var dir = System.IO.Path.GetDirectoryName(typeof(LocalCoopMod).Assembly.Location);   // coremod\mods\DeadCellsLocalCoop
+                if (!string.IsNullOrEmpty(dir)) candidates.Add(System.IO.Path.GetFullPath(System.IO.Path.Combine(dir, "..", "..", "config", "DeadCellsLocalCoop.json")));
+                candidates.Add(System.IO.Path.GetFullPath(System.IO.Path.Combine(Environment.CurrentDirectory, "coremod", "config", "DeadCellsLocalCoop.json")));
+                var path = candidates.Find(System.IO.File.Exists);
+                if (path == null) return;
+                var text = System.IO.File.ReadAllText(path);
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(text, new System.Text.Json.JsonDocumentOptions
+                    {
+                        AllowTrailingCommas = true,
+                        CommentHandling = System.Text.Json.JsonCommentHandling.Skip,
+                    });
+                }
+                catch (System.Text.Json.JsonException ex)
+                {
+                    var backup = path + ".broken.txt";
+                    System.IO.File.Copy(path, backup, true);
+                    _configProblem = ex.LineNumber is long line ? $"line {line + 1}" : "unknown line";
+                    Logger.Warning("[LocalCoop] DeadCellsLocalCoop.json has a typo ({Where}: {Error}). The mod starts with default settings; your file was kept as {Backup}",
+                        _configProblem, ex.Message, System.IO.Path.GetFileName(backup));
+                }
+            }
+            catch (Exception ex) { Logger.Warning(ex, "[LocalCoop] Checking the settings file failed"); }
+        }
+
+        private void ShowConfigNotice(Hero p1)
+        {
+            if (_configProblem == null || _configNoticeShown || ScreenOpen) return;
+            _configNoticeShown = true;
+            try { p1.popText($"CO-OP SETTINGS FILE HAS A TYPO ({_configProblem.ToUpperInvariant()}): DEFAULTS USED".AsHaxeString(), 0xFF6060); } catch { }
+        }
+
         // ------------------------------------------------------------------ test warp
 
         private void Hook_LevelTransition_loadNewLevel(dc.cine.Hook_LevelTransition.orig_loadNewLevel orig, dc.cine.LevelTransition self)

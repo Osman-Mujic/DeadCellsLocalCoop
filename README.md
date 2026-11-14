@@ -66,6 +66,8 @@ choose sides the first time.
 Testing the Lighthouse: set `"TestWarpTo": "T_Lighthouse"` (game closed), start or continue a run, and
 take the next level exit (the first one out of the Prisoners' Quarters works): it leads to the Lighthouse's entrance. It works once and
 then clears itself. You arrive with whatever gear you have.
+If the settings file has a typo, the mod says so in the game, starts with default settings and keeps your file
+as `DeadCellsLocalCoop.json.broken.txt`.
 
 ## Known issues
 
@@ -76,6 +78,7 @@ then clears itself. You arrive with whatever gear you have.
   the sisters stop chasing. Fixed in 0.11.1, not confirmed in play yet.
 - Frostbite and Superconductor work for whichever player has them: an enemy that is frozen (or shocked) takes the
   damage if either player has the mutation, whoever froze it. The game does not record who froze an enemy.
+- Health fountains give each player one refill and stay full-looking until both have used it (0.11.3).
 - If the flask icon ever looks wrong, the mod redraws it within two seconds (0.11.2) and notes it in the log.
 - In co-op both life bars keep one fixed width, so the HUDs never move; the numbers show the real life.
 - If a controller switches off, player 1 keeps theirs; when both are connected again the side screen opens.

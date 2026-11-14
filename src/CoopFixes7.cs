@@ -22,6 +22,8 @@ namespace LocalCoop
             // Fountains between biomes: one refill per player (the game marks the fountain used after one).
             Hook_Fountain.canBeActivated += Hook_Fountain_canBeActivated;
             Hook_Fountain.onActivate += Hook_Fountain_onActivate;
+            // ...and it keeps looking full until both have used it (playtest 13).
+            Hook_Fountain.fixedUpdate += Hook_Fountain_fixedUpdate;
 
             // Forges: the menu lists and upgrades game.hero's items, so run it as whoever talked to the smith.
             Hook_SmallBlacksmith.onActivate += (orig, self, by, lp) => RunAsPicker(by, () => orig(self, by, lp));
@@ -85,10 +87,73 @@ namespace LocalCoop
                 {
                     var u = _fountainUse.GetOrCreateValue(self);
                     if (IsP2(by)) u.P2 = true; else u.P1 = true;
+                    if (u.P1 != u.P2 && !_fountainsToRefill.Exists(f => CoopInput.Ptr(f) == CoopInput.Ptr(self)))
+                        _fountainsToRefill.Add(self);
                     Logger.Information("[LocalCoop] {Who} used the fountain ({Left})", IsP2(by) ? "P2" : "P1",
                         u.P1 && u.P2 ? "both done" : "partner can still use it");
                 }
                 else if (wasUsed && !self.used) self.used = true;   // refused ("I don't need it"): put it back
+            }
+        }
+
+        // A used fountain looks empty: the refill cinematic (cine.HealFountain f@13837, step f@13894) plays the liquid
+        // sprite "fxAlambic" from full (frame 0) to empty (last frame), and Fountain.fixedUpdate (f@13847) darkens it and
+        // switches its lights off while `used` is set. With one refill per player the partner's half still looked
+        // gone, so players thought the fountain was used up (playtest 13). While only one player has used it, the
+        // darkening is skipped and the liquid flows back in once the cinematic is over.
+        private readonly List<Fountain> _fountainsToRefill = new();
+        private readonly HashSet<IntPtr> _fountainRefillPlayed = new();
+
+        private bool OnePlayerLeft(Fountain f) => _fountainUse.TryGetValue(f, out var u) && u.P1 != u.P2;
+
+        private void Hook_Fountain_fixedUpdate(Hook_Fountain.orig_fixedUpdate orig, Fountain self)
+        {
+            if (!CoopActive || !self.used || self.broken || !OnePlayerLeft(self)) { orig(self); return; }
+            self.used = false;   // no darkening yet
+            try { orig(self); }
+            finally { self.used = true; }
+        }
+
+        /// <summary>Per frame: refill the look of fountains the partner can still use.</summary>
+        private void UpdateFountainLooks()
+        {
+            if (_fountainsToRefill.Count == 0) return;
+            var game = Game.Class.ME;
+            if (game == null || game.hasCinematic()) return;
+            for (int i = _fountainsToRefill.Count - 1; i >= 0; i--)
+            {
+                var f = _fountainsToRefill[i];
+                try
+                {
+                    if (f.destroyed || f._level == null || !ReferenceEquals(f._level, game.curLevel) || !OnePlayerLeft(f))
+                    {
+                        _fountainsToRefill.RemoveAt(i);
+                        _fountainRefillPlayed.Remove(CoopInput.Ptr(f));
+                        continue;
+                    }
+                    var fx = f.liquidFX;
+                    if (fx == null || fx.destroyed) { _fountainsToRefill.RemoveAt(i); continue; }
+                    var anim = fx.get_anim();
+                    if (anim != null && anim.stack != null && anim.stack.length > 0) continue;   // still draining
+                    if (fx.frame == 0) { _fountainsToRefill.RemoveAt(i); _fountainRefillPlayed.Remove(CoopInput.Ptr(f)); continue; }
+                    if (anim != null && _fountainRefillPlayed.Add(CoopInput.Ptr(f)))
+                    {
+                        // The drain played backwards: the fountain fills up again for the partner.
+                        anim.play("fxAlambic".AsHaxeString(), null, null).reverse();
+                        Logger.Information("[LocalCoop] Fountain refilled for the partner (looks full again)");
+                    }
+                    else
+                    {
+                        fx.setFrame(0);
+                        _fountainsToRefill.RemoveAt(i);
+                        _fountainRefillPlayed.Remove(CoopInput.Ptr(f));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _fountainsToRefill.RemoveAt(i);
+                    if (_hud2Errors.Add("fountain:" + ex.Message)) Logger.Warning(ex, "[LocalCoop] Fountain look update failed");
+                }
             }
         }
 

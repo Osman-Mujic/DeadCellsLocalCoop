@@ -88,6 +88,7 @@ namespace LocalCoop
         public override void Initialize()
         {
             Instance = this;
+            CheckConfigFile();
             _config = new Config<CoopConfig>("DeadCellsLocalCoop");
             Config = _config.Value;
             _input = new CoopInput(Logger);
@@ -301,6 +302,8 @@ namespace LocalCoop
                 UpdateBossRegroup();
                 UpdateMutationShare(p1, P2);
                 UpdateFlaskDisplay(p1, P2);
+                UpdateFountainLooks();
+                ShowConfigNotice(p1);
                 UpdateLeash(p1, P2, dt);
                 if (!ScreenOpen)
                 {
